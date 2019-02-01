@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Apache Kafka Cruise Control Frontend",
   "author": "Naresh <nareshv@linkedin.com>",
+  "license": "BSD-2-Clause",
   "private": true,
   "scripts": {
     "dev": "test -d cruise-control-ui && cd cruise-control-ui; node build/dev-server.js",
