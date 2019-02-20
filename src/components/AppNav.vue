@@ -42,8 +42,9 @@ export default {
   created () {
     let vm = this
     let notselected = true
+    let url = vm.$store.state.configurl + '?_t=' + (new Date() / 1)
     // download the cluster information csv file
-    vm.$http.get(vm.$store.state.configurl, {withCredentials: true}).then((r) => {
+    vm.$http.get(url, {withCredentials: true}).then((r) => {
       let lines = r.data.split(/\n/)
       let groups = {}
       let config = {}
