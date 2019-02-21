@@ -32,21 +32,7 @@ In addition to these there is support for these common features
 Documenation
 =============
 
-Documentation has been moved to the [wiki](https://github.com/linkedin/cruise-control-ui/wiki).
-
-
-Application Screens
-===================
-
-Following are the screenshots for the application when started for the first time with a kafka cluster running 3 brokers on a single server.
-
-- [Kafka Cluster Status](images/01-kafka-cluster-status.png)
-- [Kafka Cluster Load](images/02-kafka-cluster-load.png)
-- [Kafka Administration](images/03-admin.png)
-- [Kafka Cluster Rebalance - Advanced](images/03-admin-1.png)
-- [UI Preferences](images/04-preferences.png)
-- [Cruise Control Tasks](images/05-tasks.png)
-- [Cruise Control State](images/06-cc-state.png)
+Application Screnshots & How-to Guides are available in the [wiki](https://github.com/linkedin/cruise-control-ui/wiki).
 
 License
 =======
