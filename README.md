@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="Cruise Control Frontend" src="images/cc-logo.png">
+  <img height='100px' alt="Cruise Control Frontend" src="images/cc-logo.png">
 </p>
 
 Introduction
