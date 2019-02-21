@@ -118,9 +118,11 @@ As defined in https://github.com/linkedin/cruise-control
   npm run build
 ```
 
+NOTE: As part of build process `static/config.csv` is copied to `dist/static/config.csv`. 
+
 5. Make config changes to `config.csv` so that the UI will start talking to local cruise-control first
 
-Add this line to `static/config.csv`
+Add this line to `dist/static/config.csv` (post build) and `static/config.csv` (pre build)
 
 ```
 local,localhost,/kafkacruisecontrol
