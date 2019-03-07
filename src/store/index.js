@@ -28,7 +28,10 @@ export default new Vuex.Store({
       admin_broker: true
     },
     hideHelperURL: true,
-    showFullStackTrace: false
+    showFullStackTrace: false,
+    // config.csv reload control variables
+    enableConfigFileReload: false,
+    configFileReloadInterval: 50000 // in milli seconds
   },
   getters: {
     geturl: function (state) {
