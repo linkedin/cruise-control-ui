@@ -22,7 +22,7 @@
             <th><input type="checkbox" v-model="$store.state.hideHelperURL"></th>
           </tr>
           <tr><th colspan=2 class='text-center'>Modules to Enable</th></tr>
-          <tr v-for="(v, k) in $store.state.modules">
+          <tr v-for="(v, k) in $store.state.modules" :key='k'>
             <td>Enable <b>{{ k | camelCase }}</b>  UI Module</td>
             <th><input type="checkbox" v-model="$store.state.modules[k]"></th>
           </tr>
