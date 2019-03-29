@@ -17,6 +17,7 @@ import Preferences from '@/components/Preferences'
 import AdminBroker from '@/components/AdminBroker'
 import AdminSampling from '@/components/AdminSampling'
 import UserTasks from '@/components/UserTasks'
+import ConfigInsights from '@/components/ConfigInsights'
 import store from '@/store'
 
 Vue.use(Router)
@@ -34,6 +35,11 @@ export default new Router({
       name: 'preferences',
       path: '/preferences',
       component: Preferences
+    },
+    {
+      name: 'configInsights',
+      path: '/configInsights',
+      component: ConfigInsights
     },
     {
       name: 'page',
