@@ -25,7 +25,9 @@ export default new Vuex.Store({
       proposals: false,
       user_tasks: true,
       // admin_state: true,
-      admin_broker: true
+      admin_broker: true,
+      // peer reviews module
+      review: true
     },
     hideHelperURL: true,
     showFullStackTrace: false,

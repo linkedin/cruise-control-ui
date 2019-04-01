@@ -18,6 +18,7 @@ import AdminBroker from '@/components/AdminBroker'
 import AdminSampling from '@/components/AdminSampling'
 import UserTasks from '@/components/UserTasks'
 import ConfigInsights from '@/components/ConfigInsights'
+import PeerReview from '@/components/PeerReview'
 import store from '@/store'
 
 Vue.use(Router)
@@ -127,6 +128,12 @@ export default new Router({
           name: 'page.admin_broker',
           path: 'admin_broker',
           component: AdminBroker,
+          props: true
+        },
+        {
+          name: 'page.review',
+          path: 'review',
+          component: PeerReview,
           props: true
         }
       ],
