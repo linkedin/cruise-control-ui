@@ -66,8 +66,6 @@
 
 <script>
 import KafkaBrokerState from '@/components/KafkaBrokerState'
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 import KafkaPartitionState from '@/components/KafkaPartitionState'
 
 export default {
@@ -78,8 +76,6 @@ export default {
   },
   components: {
     KafkaBrokerState,
-    Exception,
-    AsyncTask,
     KafkaPartitionState
   },
   data () {

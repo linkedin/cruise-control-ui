@@ -13,16 +13,12 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
 
 export default {
   name: 'AdminSampling',
   props: {
     'group': String,
     'cluster': String
-  },
-  components: {
-    Exception
   },
   data () {
     return {

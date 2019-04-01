@@ -66,8 +66,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 import AdminSampling from '@/components/AdminSampling'
 import BooleanEL from '@/components/BooleanEL'
 
@@ -79,8 +77,6 @@ export default {
   },
   components: {
     BooleanEL,
-    Exception,
-    AsyncTask,
     AdminSampling
   },
   data () {

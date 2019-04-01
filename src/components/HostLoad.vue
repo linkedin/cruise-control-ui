@@ -57,8 +57,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-
 export default {
   name: 'HostLoad',
   props: {
@@ -68,9 +66,6 @@ export default {
     asyncData: null, // when the server treats the request as async and sends progress instead of actual response
     error: Boolean,
     errorData: Object
-  },
-  components: {
-    exception: Exception
   },
   data () {
     return {

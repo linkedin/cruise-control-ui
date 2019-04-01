@@ -32,8 +32,6 @@
 <script>
 import HostLoad from '@/components/HostLoad'
 import BrokerLoad from '@/components/BrokerLoad'
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 
 export default {
   name: 'Load',
@@ -119,9 +117,7 @@ export default {
   },
   components: {
     BrokerLoad,
-    HostLoad,
-    Exception,
-    AsyncTask
+    HostLoad
   }
 }
 </script>

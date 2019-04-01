@@ -101,8 +101,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 import DiffCell from '@/components/DiffCell'
 import Goal from '@/components/Goal'
 
@@ -110,9 +108,7 @@ export default {
   name: 'Proposals',
   components: {
     DiffCell,
-    Goal,
-    Exception,
-    AsyncTask
+    Goal
   },
   data () {
     return {

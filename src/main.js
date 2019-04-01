@@ -10,10 +10,15 @@ import App from './App'
 import Api from './api'
 import router from './router'
 import store from './store'
+import Exception from '@/components/Exception'
+import AsyncTask from '@/components/AsyncTask'
 import 'bootstrap/js/dist/dropdown'
 import 'bootswatch/dist/cosmo/bootstrap.css'
 
 Vue.use(Vuex)
+
+Vue.component('exception', Exception)
+Vue.component('async-task', AsyncTask)
 
 Vue.prototype.$http = Axios
 Vue.prototype.$helpers = Api

@@ -75,9 +75,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
-
 export default {
   name: 'ReplicaLoad',
   props: {
@@ -96,10 +93,6 @@ export default {
       tos: false,
       racks: []
     }
-  },
-  components: {
-    Exception,
-    AsyncTask
   },
   watch: {
     group: (ngroup) => {

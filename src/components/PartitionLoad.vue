@@ -126,16 +126,12 @@
 
 <script>
 import xssFilters from 'xss-filters'
-import Exception from '@/components/Exception'
 
 export default {
   name: 'PartitionLoad',
   props: {
     group: String,
     cluster: String
-  },
-  components: {
-    'exception': Exception
   },
   data () {
     return {

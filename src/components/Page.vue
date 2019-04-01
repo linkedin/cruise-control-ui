@@ -46,6 +46,9 @@
             <router-link :to='{"name": "page.admin_state", params: { group: group, cluster: cluster, embed: true } }'>&#9881; Sampling Admin</router-link>
           </li>
           -->
+          <li class="nav-item" v-if='modules.review'>
+            <router-link class="nav-link" :to='{"name": "page.review", params: { group: group, cluster: cluster } }'>Peer Reviews</router-link>
+          </li>
           <li class="nav-item" v-if='modules.admin_broker'>
             <router-link class="nav-link" :to='{"name": "page.admin_broker", params: { group: group, cluster: cluster } }'>&#9881; Kafka Cluster Administration</router-link>
           </li>

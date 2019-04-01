@@ -131,8 +131,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 import BooleanEL from '@/components/BooleanEL'
 
 export default {
@@ -142,9 +140,7 @@ export default {
     'cluster': String
   },
   components: {
-    BooleanEL,
-    Exception,
-    AsyncTask
+    BooleanEL
   },
   data () {
     return {

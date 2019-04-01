@@ -521,7 +521,6 @@
 import xssFilters from 'xss-filters'
 import goals from '@/goals'
 import BrokerState from '@/components/BrokerState'
-import Exception from '@/components/Exception'
 
 export default {
   name: 'AdminBroker',
@@ -530,8 +529,7 @@ export default {
     cluster: String
   },
   components: {
-    BrokerState,
-    Exception
+    BrokerState
   },
   data () {
     return {
