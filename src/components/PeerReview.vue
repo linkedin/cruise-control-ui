@@ -118,7 +118,10 @@ export default {
       vm.loading = true
       vm.selectedIds = []
       vm.$http.post(vm.url, {withCredentials: true}).then((r) => {
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -131,7 +134,7 @@ export default {
       }, (e) => {
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     },
     doAction () {
@@ -147,7 +150,6 @@ export default {
       let absUrl = this.reconstructURL(action, r.Id)
       let vm = this
       vm.$http.post(absUrl, {withCredentials: true}).then((r) => {
-        console.log('success')
         vm.posted = true
         vm.postResponse = r.data || 'Cruise Control Did not send a valid response. Check the server logs.'
         vm.getReviews()
