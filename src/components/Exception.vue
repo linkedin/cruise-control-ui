@@ -21,7 +21,7 @@
 export default {
   name: 'Exception',
   props: {
-    exception: [String, Object]
+    exception: [String, Object, Error]
   }
 }
 </script>
