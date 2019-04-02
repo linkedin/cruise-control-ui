@@ -790,7 +790,20 @@ export default {
       let vm = this
       vm.posted = true
       this.clearPostResponse()
-      this.$http.post(vm.actionURL, {withCredentials: true}).then((r) => {
+      let params = {
+        withCredentials: true
+      }
+      // check if there is a running user-task-id for this end point in the $store
+      // let task = this.$store.getters.getTaskId('proposals')
+      let task = this.$store.getters.getTaskId(vm.actionURL)
+      if (task) {
+        params['headers'] = {
+          'User-Task-Id': task
+        }
+      }
+      this.$http.post(vm.actionURL, params).then((r) => {
+        let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
+        vm.$store.commit('setTaskId', {url: vm.actionURL, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
         vm.posted = true
         vm.postResponse = r.data
       }, (e) => {
