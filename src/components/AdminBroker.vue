@@ -521,7 +521,6 @@
 import xssFilters from 'xss-filters'
 import goals from '@/goals'
 import BrokerState from '@/components/BrokerState'
-import Exception from '@/components/Exception'
 
 export default {
   name: 'AdminBroker',
@@ -530,8 +529,7 @@ export default {
     cluster: String
   },
   components: {
-    BrokerState,
-    Exception
+    BrokerState
   },
   data () {
     return {
@@ -792,7 +790,20 @@ export default {
       let vm = this
       vm.posted = true
       this.clearPostResponse()
-      this.$http.post(vm.actionURL, {withCredentials: true}).then((r) => {
+      let params = {
+        withCredentials: true
+      }
+      // check if there is a running user-task-id for this end point in the $store
+      // let task = this.$store.getters.getTaskId('proposals')
+      let task = this.$store.getters.getTaskId(vm.actionURL)
+      if (task) {
+        params['headers'] = {
+          'User-Task-Id': task
+        }
+      }
+      this.$http.post(vm.actionURL, params).then((r) => {
+        let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
+        vm.$store.commit('setTaskId', {url: vm.actionURL, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
         vm.posted = true
         vm.postResponse = r.data
       }, (e) => {
@@ -806,7 +817,10 @@ export default {
       let url = vm.$helpers.getURL('kafka_cluster_state')
       // console.log(url)
       this.$http.get(url, {withCredentials: true}).then((r) => {
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -831,7 +845,7 @@ export default {
       }, (e) => {
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     }
   }

@@ -126,16 +126,12 @@
 
 <script>
 import xssFilters from 'xss-filters'
-import Exception from '@/components/Exception'
 
 export default {
   name: 'PartitionLoad',
   props: {
     group: String,
     cluster: String
-  },
-  components: {
-    'exception': Exception
   },
   data () {
     return {
@@ -232,8 +228,24 @@ export default {
       let vm = this
       vm.loaded = false
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+      let params = {
+        withCredentials: true
+      }
+      // check if there is a running user-task-id for this end point in the $store
+      // let task = this.$store.getters.getTaskId('proposals')
+      let task = this.$store.getters.getTaskId(vm.url)
+      if (task) {
+        params['headers'] = {
+          'User-Task-Id': task
+        }
+      }
+      vm.$http.get(vm.url, params).then((r) => {
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
+          vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -255,7 +267,7 @@ export default {
       }, (e) => {
         vm.error = true
         vm.loading = false
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     }
   }

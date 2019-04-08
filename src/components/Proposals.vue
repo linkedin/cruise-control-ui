@@ -101,8 +101,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 import DiffCell from '@/components/DiffCell'
 import Goal from '@/components/Goal'
 
@@ -110,9 +108,7 @@ export default {
   name: 'Proposals',
   components: {
     DiffCell,
-    Goal,
-    Exception,
-    AsyncTask
+    Goal
   },
   data () {
     return {
@@ -292,9 +288,31 @@ export default {
     getProposals () {
       let vm = this
       vm.loading = true
-      vm.$http.get(this.url, {withCredentials: true}).then((r) => {
+      let params = {
+        withCredentials: true
+      }
+      // check if there is a running user-task-id for this end point in the $store
+      // let task = this.$store.getters.getTaskId('proposals')
+      let task = this.$store.getters.getTaskId(vm.url)
+      if (task) {
+        params['headers'] = {
+          'User-Task-Id': task
+        }
+      }
+      vm.$http.get(this.url, params).then((r) => {
         vm.loading = false
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+        /*
+        vm.$store.commit('setTaskId', {url: vm.url, taskid: Math.random() * 10000})
+        console.log(['gettaskId', vm.$store.getters.getTaskId()])
+        */
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          // save the task-id if its present in the response header
+          let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
+          vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
+          // set the internal bits
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -323,7 +341,7 @@ export default {
         vm.error = true
         vm.loading = false
         vm.goals = []
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     }
   }

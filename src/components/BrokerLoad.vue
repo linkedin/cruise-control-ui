@@ -59,7 +59,6 @@
 
 <script>
 import BrokerState from '@/components/BrokerState'
-import Exception from '@/components/Exception'
 export default {
   name: 'BrokerLoad',
   props: {
@@ -69,8 +68,7 @@ export default {
     errorData: Object
   },
   components: {
-    BrokerState,
-    Exception
+    BrokerState
   },
   data () {
     return {

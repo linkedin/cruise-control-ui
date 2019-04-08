@@ -50,7 +50,6 @@
 </template>
 
 <script>
-import Exception from '@/components/Exception'
 import BooleanEL from '@/components/BooleanEL'
 
 export default {
@@ -60,8 +59,7 @@ export default {
     cluster: String
   },
   components: {
-    BooleanEL,
-    Exception
+    BooleanEL
   },
   data () {
     return {
@@ -100,7 +98,10 @@ export default {
       const vm = this
       vm.loading = true
       vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -114,7 +115,7 @@ export default {
       }, (e) => {
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     }
   },

@@ -32,8 +32,6 @@
 <script>
 import HostLoad from '@/components/HostLoad'
 import BrokerLoad from '@/components/BrokerLoad'
-import Exception from '@/components/Exception'
-import AsyncTask from '@/components/AsyncTask'
 
 export default {
   name: 'Load',
@@ -98,8 +96,25 @@ export default {
     getLoad () {
       let vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+      let params = {
+        withCredentials: true
+      }
+      // check if there is a running user-task-id for this end point in the $store
+      // let task = this.$store.getters.getTaskId('proposals')
+      let task = this.$store.getters.getTaskId(vm.url)
+      if (task) {
+        params['headers'] = {
+          'User-Task-Id': task
+        }
+      }
+      vm.$http.get(vm.url, params).then((r) => {
+        if (r.data === null || r.data === undefined || r.data === '') {
+          vm.error = true
+          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
+        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          // capture the user-task-id only if the response is Async one
+          let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
+          vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
           vm.async = true
           vm.asyncData = r.data
         } else {
@@ -113,15 +128,13 @@ export default {
       }, (e) => {
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response ? e.response.data : e
+        vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
     }
   },
   components: {
     BrokerLoad,
-    HostLoad,
-    Exception,
-    AsyncTask
+    HostLoad
   }
 }
 </script>
