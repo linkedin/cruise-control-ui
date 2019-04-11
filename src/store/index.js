@@ -11,7 +11,7 @@ export default new Vuex.Store({
     config: {}, // remote cc urls information
     configError: null, // true if we have problem loading configuration
     configErrorMessage: null, // Actual configuration loading-error message
-    url: null,
+    url: null, // origin of the current CC we are dealing with
     online: true,
     autoReloadEnabled: false, // disabled by default
     autoReloadInterval: 30000, // 30 seconds
@@ -22,7 +22,7 @@ export default new Vuex.Store({
       load: true,
       // replicaload: false, This has been removed from backend code
       partitionload: true,
-      proposals: false,
+      proposals: true,
       user_tasks: true,
       // admin_state: true,
       admin_broker: true,
@@ -33,7 +33,11 @@ export default new Vuex.Store({
     showFullStackTrace: false,
     // config.csv reload control variables
     enableConfigFileReload: false,
-    configFileReloadInterval: 50000 // in milli seconds
+    configFileReloadInterval: 50000, // in milli seconds
+    // user-task-id features
+    userTasks: {
+      // url: uuid (is the structure for this)
+    }
   },
   getters: {
     geturl: function (state) {
@@ -42,6 +46,11 @@ export default new Vuex.Store({
     getnewurl: function (state, getters) {
       return function (group, label) {
         return state.config[group][label]
+      }
+    },
+    getTaskId: function (state, getters) {
+      return function (url) {
+        return state.userTasks[url]
       }
     }
   },
@@ -60,6 +69,15 @@ export default new Vuex.Store({
     },
     configErrorMessage: function (state, val) {
       state.configErrorMessage = val
+    },
+    setTaskId: function (state, params) {
+      if (params.taskid) {
+        // set if the taskid is valid
+        Vue.set(state.userTasks, params.url, params.taskid)
+      } else {
+        // delete if the taskid is invalid
+        Vue.delete(state.userTasks, params.url)
+      }
     }
   }
 })
