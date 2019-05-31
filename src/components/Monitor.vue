@@ -24,7 +24,10 @@
           <div class="card-header">Monitor</div>
           <div class="card-body  align-items-center d-flex justify-content-center">
             <p class="card-text" v-if='MonitorState.state == "LOADING"'><span class="badge badge-info">{{ MonitorState.state }} ({{ MonitorState.loadingProgressPct.toFixed(2) }})</span></p>
-            <p class="card-text" v-else><span :class="['badge', MonitorState.state == 'STOPPED' ? 'badge-danger': 'badge-success']">{{ MonitorState.state }}</span></p>
+            <p class="card-text" v-else>
+              <span :class="monitor_class">{{ MonitorState.state }}</span>
+              <a class='pointer' @click.prevent='doAction()' :title='monitor_title'>&#x23ef;</a>
+            </p>
           </div>
         </div>
         <div class="card text-center">
@@ -66,7 +69,6 @@
 </template>
 
 <script>
-import AdminSampling from '@/components/AdminSampling'
 import BooleanEL from '@/components/BooleanEL'
 
 export default {
@@ -76,8 +78,7 @@ export default {
     'cluster': String
   },
   components: {
-    BooleanEL,
-    AdminSampling
+    BooleanEL
   },
   data () {
     return {
@@ -119,6 +120,31 @@ export default {
     },
     url () {
       return this.$helpers.getURL('state', {substates: 'MONITOR', verbose: true})
+    },
+    get_action_url () {
+      if (this.MonitorState.state === 'PAUSED') {
+        return this.$helpers.getURL('resume_sampling')
+      } else {
+        return this.$helpers.getURL('pause_sampling')
+      }
+    },
+    monitor_title () {
+      if (this.MonitorState.state === 'PAUSED') {
+        return 'Resume monitor'
+      } else {
+        return 'Pause monitor'
+      }
+    },
+    monitor_class () {
+      if (this.MonitorState.state === 'PAUSED') {
+        return 'badge badge-secondary'
+      } else if (this.MonitorState.state === 'RUNNING') {
+        return 'badge badge-success'
+      } else if (this.MonitorState.state === 'STOPPED') {
+        return 'badge badge-danger'
+      } else {
+        return 'badge badge-primary'
+      }
     }
   },
   methods: {
@@ -152,6 +178,15 @@ export default {
         vm.error = true
         vm.errorData = e && e.response && e.response.data ? e.response.data : e
       })
+    },
+    doAction () {
+      let vm = this
+      console.log(vm.get_action_url)
+      this.$http.post(vm.get_action_url, {withCredentials: true}).then((r) => {
+        this.getState()
+      }, (e) => {
+        this.getState()
+      })
     }
   }
 }
@@ -167,4 +202,5 @@ export default {
 .fade-enter, .fade-leave-to  {
   opacity: 0
 }
+.pointer {cursor: pointer;}
 </style>
