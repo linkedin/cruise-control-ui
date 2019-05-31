@@ -1,10 +1,19 @@
 <!-- Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. -->
 <template>
   <div>
+    <div class="alert alert-info" v-if='!hideHelperURL'>
+      <b>URL ({{group}}, {{cluster}}):</b> <a target=_blank :href='url'>{{ url }}</a>
+    </div>
+    <div v-if='!loading && !taskId' class='alert alert-danger'>
+      <strong>User-Task-ID</strong> header is not found in the response from the server. If you are using <a target=_blank href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>CORS</a>, please add necessary configuration to your Cruise Control as described <a target=_blank href='https://github.com/linkedin/cruise-control-ui/wiki/CORS-Method'>in this wiki.</a>
+    </div>
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>
     <div v-if='async'>
+      <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
+        <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
+      </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-if='loading'>
@@ -106,6 +115,10 @@ import Goal from '@/components/Goal'
 
 export default {
   name: 'Proposals',
+  props: {
+    'group': String,
+    'cluster': String
+  },
   components: {
     DiffCell,
     Goal
@@ -130,7 +143,8 @@ export default {
       loadAfter: {},
       goals: {},
       // show percentage diff
-      showpct: false
+      showpct: false,
+      showAsyncRefreshButton: false
     }
   },
   created () {
@@ -145,6 +159,12 @@ export default {
     }
   },
   computed: {
+    taskId () {
+      return this.$store.getters.getTaskId(this.url)
+    },
+    hideHelperURL () {
+      return this.$store.state.hideHelperURL
+    },
     loadingSeconds () {
       if (this.loading) {
         this.loadingSecondsNow++
@@ -287,16 +307,18 @@ export default {
     },
     getProposals () {
       let vm = this
+      vm.error = false
+      vm.async = false
       vm.loading = true
       let params = {
         withCredentials: true
       }
       // check if there is a running user-task-id for this end point in the $store
       // let task = this.$store.getters.getTaskId('proposals')
-      let task = this.$store.getters.getTaskId(vm.url)
-      if (task) {
+      let task = this.task
+      if (this.task) {
         params['headers'] = {
-          'User-Task-Id': task
+          'User-Task-ID': task
         }
       }
       vm.$http.get(this.url, params).then((r) => {
@@ -315,6 +337,7 @@ export default {
           // set the internal bits
           vm.async = true
           vm.asyncData = r.data
+          vm.showAsyncRefreshButton = true
         } else {
           vm.async = false
           vm.loading = false

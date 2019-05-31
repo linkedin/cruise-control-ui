@@ -6,8 +6,17 @@
         <button class="btn btn-primary" @click='getKafkaState()'>Refresh Broker Details</button>
       </div>
     </div>
+    <div v-if='!loading && !taskId' class='alert alert-danger'>
+      <strong>User-Task-ID</strong> header is not found in the response from the server. If you are using <a target=_blank href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>CORS</a>, please add necessary configuration to your Cruise Control as described <a target=_blank href='https://github.com/linkedin/cruise-control-ui/wiki/CORS-Method'>in this wiki.</a>
+    </div>
     <div v-if='error'>
       <exception :exception='errorData'></exception>
+    </div>
+    <div v-else-if='async'>
+      <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
+        <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
+      </div>
+      <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if="!loaded && loading">
       Loading Brokers ...
@@ -589,6 +598,9 @@ export default {
     this.argsChanged()
   },
   computed: {
+    taskId () {
+      return this.$store.getters.getTaskId(this.url)
+    },
     disableGoals () {
       return this.kafka_assigner || this.use_ready_default_goals
     },
@@ -798,7 +810,7 @@ export default {
       let task = this.$store.getters.getTaskId(vm.actionURL)
       if (task) {
         params['headers'] = {
-          'User-Task-Id': task
+          'User-Task-ID': task
         }
       }
       this.$http.post(vm.actionURL, params).then((r) => {
@@ -813,6 +825,8 @@ export default {
     },
     getKafkaState () {
       const vm = this
+      vm.error = false
+      vm.async = false
       vm.loading = true
       let url = vm.$helpers.getURL('kafka_cluster_state')
       // console.log(url)
@@ -823,6 +837,7 @@ export default {
         } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
           vm.async = true
           vm.asyncData = r.data
+          vm.showAsyncRefreshButton = true
         } else {
           vm.async = false
           vm.error = false

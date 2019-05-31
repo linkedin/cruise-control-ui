@@ -4,6 +4,9 @@
     <div class="alert alert-info" v-if='!hideHelperURL'>
       <b>URL ({{group}}, {{cluster}}):</b> <a target=_blank :href='url'>{{ url }}</a>
     </div>
+    <div v-if='!loading && !taskId' class='alert alert-danger'>
+      <strong>User-Task-ID</strong> header is not found in the response from the server. If you are using <a target=_blank href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>CORS</a>, please add necessary configuration to your Cruise Control as described <a target=_blank href='https://github.com/linkedin/cruise-control-ui/wiki/CORS-Method'>in this wiki.</a>
+    </div>
     <div v-if='!loading'>
       <div class="alert alert-primary">
         <b>Flags: </b>
@@ -15,13 +18,15 @@
       <exception :exception='errorData'></exception>
     </div>
     <div v-else-if='async'>
+      <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
+        <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
+      </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if='!loaded && loading'>
       <p>Loading ...</p>
     </div>
     <div v-else>
-
       <host-load :hosts='hosts' :loading='loading' :error='error' :errorData='errorData'></host-load>
       <br>
       <broker-load :brokers='brokers' :loading='loading' :error='error' :errorData='errorData'></broker-load>
@@ -72,6 +77,9 @@ export default {
     }
   },
   computed: {
+    taskId () {
+      return this.$store.getters.getTaskId(this.url)
+    },
     url () {
       // KCC Supports additional parameters as well.
       // time=[TIMESTAMP]
@@ -95,6 +103,8 @@ export default {
     },
     getLoad () {
       let vm = this
+      vm.error = false
+      vm.async = false
       vm.loading = true
       let params = {
         withCredentials: true
@@ -104,7 +114,7 @@ export default {
       let task = this.$store.getters.getTaskId(vm.url)
       if (task) {
         params['headers'] = {
-          'User-Task-Id': task
+          'User-Task-ID': task
         }
       }
       vm.$http.get(vm.url, params).then((r) => {
@@ -117,6 +127,7 @@ export default {
           vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
           vm.async = true
           vm.asyncData = r.data
+          vm.showAsyncRefreshButton = true
         } else {
           vm.async = false
           vm.loading = false
