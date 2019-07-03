@@ -750,7 +750,7 @@ export default {
         // POST /kafkacruisecontrol/rebalance
         // ?dryrun=[true/false]
         // ?rebalance_disk=true
-        params.rebalance_disk='true'
+        params.rebalance_disk = 'true'
         return vm.$helpers.getURL('rebalance', params)
       }
       // console.log(' no url !')
