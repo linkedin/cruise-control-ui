@@ -72,6 +72,10 @@
           <label class="form-check-label">Rebalance Cluster</label>
         </div>
         <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" value="rebalance_disk" v-model='actionName' :disabled='selectedBrokers.length != 0'>
+          <label class="form-check-label">Rebalance Broker Disks</label>
+        </div>
+        <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" value="add" v-model='actionName' :disabled='selectedBrokers.length == 0'>
           <label class="form-check-label">Add Brokers</label>
         </div>
@@ -119,6 +123,24 @@
           <button @click='actionBroker' class="btn btn-primary">Run PLE</button>
         </div>
       </div>
+
+      <!-- Rebalance Broker Disk -->
+      <div class="alert alert-primary" v-if='actionName === "rebalance_disk"'>
+        <h5>Rebalance Broker Disks</h5>
+        <hr>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" v-model='dryrun'>
+              <label class="form-check-label">DryRun</label>
+            </div>
+          </div>
+        </div>
+        <div class="text-right">
+          <button @click='actionBroker' class="btn btn-primary">Run Broker Disk Rebalance</button>
+        </div>
+      </div>
+
 
       <!-- Rebalance Cluster Flags -->
       <div class="alert alert-info" v-if='actionName === "rebalance"'>
@@ -722,6 +744,13 @@ export default {
         //  &concurrent_partition_movements_per_broker=[concurrency]
         //  &concurrent_leader_movements=[concurrency]
         //  &excluded_topics=[TOPICS]
+        return vm.$helpers.getURL('rebalance', params)
+      }
+      if (vm.actionName === 'rebalance_disk') {
+        // POST /kafkacruisecontrol/rebalance
+        // ?dryrun=[true/false]
+        // ?rebalance_disk=true
+        params.rebalance_disk='true'
         return vm.$helpers.getURL('rebalance', params)
       }
       // console.log(' no url !')
