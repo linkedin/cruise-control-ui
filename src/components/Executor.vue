@@ -29,7 +29,7 @@
           </div>
         </div>
       </div>
-      <div v-if='(ExecutorState.state === "REPLICA_MOVEMENT_TASK_IN_PROGRESS" || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
+      <div v-if='(/\\*._TASK_IN_PROGRESS/.test(ExecutorState.state) || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
         <div class='card-header'>
           {{ ExecutorState.state | camelCase }}
         </div>
