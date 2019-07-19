@@ -109,19 +109,19 @@
             <div class="card">
               <div class="card-header">Aborting Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.abortingPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.abortingPartitions }}</h1></p>
               </div>
             </div>
             <div class="card">
               <div class="card-header">Aborted Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-success">{{ ExecutorState.abortedPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-success">{{ ExecutorState.abortedPartitions }}</h1></p>
               </div>
             </div>
             <div class="card">
               <div class="card-header">Dead Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-info">{{ ExecutorState.deadPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-info">{{ ExecutorState.deadPartitions }}</h1></p>
               </div>
             </div>
           </div>
