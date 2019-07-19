@@ -201,7 +201,7 @@ export default {
     getState () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true, headers: {Cache-Control: 'no-cache'}}).then((r) => {
+      vm.$http.get(vm.url, {withCredentials: true, headers: {'Cache-Control': 'no-cache'}}).then((r) => {
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
