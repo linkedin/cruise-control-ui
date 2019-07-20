@@ -29,7 +29,7 @@
           </div>
         </div>
       </div>
-      <div v-if='(ExecutorState.state === "REPLICA_MOVEMENT_TASK_IN_PROGRESS" || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
+      <div v-if='(/\\*._MOVEMENT_TASK_IN_PROGRESS/.test(ExecutorState.state) || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
         <div class='card-header'>
           {{ ExecutorState.state | camelCase }}
         </div>
@@ -109,19 +109,19 @@
             <div class="card">
               <div class="card-header">Aborting Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.abortingPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.abortingPartitions }}</h1></p>
               </div>
             </div>
             <div class="card">
               <div class="card-header">Aborted Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-success">{{ ExecutorState.abortedPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-success">{{ ExecutorState.abortedPartitions }}</h1></p>
               </div>
             </div>
             <div class="card">
               <div class="card-header">Dead Partitions</div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-info">{{ ExecutorState.deadPartitions.length }}</h1></p>
+                <p class="card-text"><h1 class="text-info">{{ ExecutorState.deadPartitions }}</h1></p>
               </div>
             </div>
           </div>
@@ -201,7 +201,7 @@ export default {
     getState () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
+      vm.$http.get(vm.url, {withCredentials: true, headers: {'Cache-Control': 'no-cache'}}).then((r) => {
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
