@@ -52,8 +52,8 @@
                 Total Data To Move
               </div>
               <div class="card-body">
-                <div>
-                  <b-progress :value="ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100" max="100" show-progress animated></b-progress>
+                <div v-if='ExecutorState.totalDataToMove'>
+                  <b-progress height="2rem" :value="ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100" max="100" show-progress animated></b-progress>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1>
               </div>
@@ -77,8 +77,8 @@
                 Total Leadership Movements
               </div>
               <div class="card-body">
-                <div>
-                  <b-progress :value="ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100" max="100" show-progress animated></b-progress>
+                <div v-if='ExecutorState.numTotalLeadershipMovements'>
+                  <b-progress height="2rem" :value="ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100" max="100" show-progress animated></b-progress>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1>
               </div>
@@ -102,8 +102,8 @@
                 Total Partition Movements
               </div>
               <div class="card-body">
-                <div>
-                  <b-progress :value="ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100" max="100" show-progress animated></b-progress>
+                <div v-if='ExecutorState.numTotalPartitionMovements'>
+                  <b-progress height="2rem" :value="ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100" max="100" show-progress animated></b-progress>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1>
               </div>
