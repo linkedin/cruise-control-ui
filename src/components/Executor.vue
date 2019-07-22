@@ -30,9 +30,10 @@
         </div>
       </div>
       <div v-if='(/\\*._MOVEMENT_TASK_IN_PROGRESS/.test(ExecutorState.state) || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
-        <div class='card-header'>
-          {{ ExecutorState.state | camelCase }}
-        </div>
+        <div>
+          <div class='card-header'>
+            {{ ExecutorState.state | camelCase }}
+          </div>
         <div class='card-body'>
           <div>
             <button class="btn btn-primary" @click='stopProposalExecution'>Stop Proposal Execution</button>
@@ -47,7 +48,10 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Data To Move</div>
+              <div class="card-header">
+                Total Data To Move
+                <b-progress :value="ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100" :max="100" show-progress animated></b-progress>
+              </div>
               <div class="card-body">
                 <p class="card-text"><h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1></p>
               </div>
@@ -67,7 +71,10 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Leadership Movements</div>
+              <div class="card-header">
+                Total Leadership Movements
+                <b-progress :value="ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100" :max="100" show-progress animated></b-progress>
+              </div>
               <div class="card-body">
                 <p class="card-text"><h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1></p>
               </div>
@@ -87,7 +94,10 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Partition Movements"</div>
+              <div class="card-header">
+                Total Partition Movements
+                <b-progress :value="ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100" :max="100" show-progress animated></b-progress>
+              </div>
               <div class="card-body">
                 <p class="card-text"><h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1></p>
               </div>
@@ -347,11 +357,9 @@ export default {
       if (typeof this.ExecutorState.inProgressPartitionMovement !== 'undefined') {
         inprogress = this.ExecutorState.inProgressPartitionMovement
       }
-
       if (typeof this.ExecutorState.pendingPartitionMovement !== 'undefined') {
         pending = this.ExecutorState.pendingPartitionMovement
       }
-
       return inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
     }
   },
