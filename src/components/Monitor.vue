@@ -6,6 +6,7 @@
     </div>
     <div v-if='!loading'>
       <div class="alert alert-primary text-right">
+        <button class="btn btn-primary" @click='bootstrapMetrics()'>Bootstrap Metrics</button>
         <button class="btn btn-primary" @click='getState()'>Refresh Monitor SubState</button>
       </div>
     </div>
@@ -121,6 +122,9 @@ export default {
     url () {
       return this.$helpers.getURL('state', {substates: 'MONITOR', verbose: true})
     },
+    bootstrapUrl () {
+      return this.$helpers.getURL('bootstrap', {clearmetrics: true})
+    },
     get_action_url () {
       if (this.MonitorState.state === 'PAUSED') {
         return this.$helpers.getURL('resume_sampling')
@@ -177,6 +181,14 @@ export default {
         vm.loading = false
         vm.error = true
         vm.errorData = e && e.response && e.response.data ? e.response.data : e
+      })
+    },
+    bootstrapMetrics () {
+      const vm = this
+      vm.$http.get(vm.bootstrapUrl, {withCredentials: true}).then((r) => {
+        alert("Bootsrtap started, cruise control will now start to read historical metrics to get to ready state, please be patient")
+      }, (e) => {
+        alert(e && e.response && e.response.data ? e.response.data : e)
       })
     },
     doAction () {
