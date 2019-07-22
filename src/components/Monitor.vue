@@ -188,7 +188,7 @@ export default {
       vm.$http.get(vm.bootstrapUrl, {withCredentials: true}).then((r) => {
         alert('Bootsrtap started, cruise control will now start to read historical metrics to get to ready state, please be patient')
       }, (e) => {
-        alert(e.errorMessage)
+        alert(e.response.data.errorMessage)
       })
     },
     doAction () {
