@@ -52,9 +52,9 @@
                 Total Data To Move
               </div>
               <div class="card-body">
-                <p class="card-text">
+                <div>
                   <b-progress :value="ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100" :max="100" show-progress animated></b-progress>
-                </p>
+                </div>
                 <h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1>
               </div>
             </div>
@@ -77,9 +77,9 @@
                 Total Leadership Movements
               </div>
               <div class="card-body">
-                <p class="card-text">
+                <div>
                   <b-progress :value="ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100" :max="100" show-progress animated></b-progress>
-                </p>
+                </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1>
               </div>
             </div>
@@ -102,9 +102,9 @@
                 Total Partition Movements
               </div>
               <div class="card-body">
-                <p class="card-text">
+                <div>
                   <b-progress :value="ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100" :max="100" show-progress animated></b-progress>
-                </p>
+                </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1>
               </div>
             </div>
