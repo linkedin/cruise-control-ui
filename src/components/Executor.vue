@@ -352,7 +352,7 @@ export default {
         pending = this.ExecutorState.pendingPartitionMovement
       }
 
-      inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
+      return inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
     }
   },
   methods: {
