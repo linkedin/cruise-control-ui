@@ -335,21 +335,21 @@ export default {
       return this.$helpers.getURL('stop_proposal_execution')
     },
     getPendingPartitionMovements () {
-      if(typeof ExecutorState.pendingPartitionMovement === 'undefined') {
+      if(typeof this.ExecutorState.pendingPartitionMovement === 'undefined') {
         return []
       } else {
-        return ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
+        return this.ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
       }
     },
     getInProgressPartitionMovements () {
       var inprogress = []
       var pending = []
-      if(typeof ExecutorState.inProgressPartitionMovement !== 'undefined') {
-        inprogress = ExecutorState.inProgressPartitionMovement
+      if(typeof this.ExecutorState.inProgressPartitionMovement !== 'undefined') {
+        inprogress = this.ExecutorState.inProgressPartitionMovement
       }
 
-      if(typeof ExecutorState.pendingPartitionMovement !== 'undefined') {
-        pending = ExecutorState.pendingPartitionMovement
+      if(typeof this.ExecutorState.pendingPartitionMovement !== 'undefined') {
+        pending = this.ExecutorState.pendingPartitionMovement
       }
 
       inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
