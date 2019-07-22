@@ -161,7 +161,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="h in ExecutorState.pendingPartitionMovement">
+                <tr v-for="h in ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')">
                   <td>{{ h.proposal.topicPartition.topic }}</td>
                   <td>{{ h.proposal.topicPartition.partition }}</td>
                   <td>{{ h.proposal.oldReplicas.join(',') }}</td>
@@ -184,7 +184,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="h in ExecutorState.inProgressPartitionMovement">
+                <tr v-for="h in ExecutorState.inProgressPartitionMovement.concat(ExecutorState.pendingPartitionMovement.filter(f => f.state === 'IN_PROGRESS'))">
                   <td>{{ h.proposal.topicPartition.topic }}</td>
                   <td>{{ h.proposal.topicPartition.partition }}</td>
                   <td>{{ h.proposal.oldReplicas.join(',') }}</td>
