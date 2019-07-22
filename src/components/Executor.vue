@@ -125,6 +125,144 @@
               </div>
             </div>
           </div>
+          <div class="card-deck mb-3">
+            <h4>Completed Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.completedPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Pending Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.pendingPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>In Progress Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.inProgressPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Aborting Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.abortingPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Aborted Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.abortedPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Dead partition Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>topic</th>
+                  <th>partition</th>
+                  <th>old replica</th>
+                  <th>new replica</th>
+                  <th>movement type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.deadPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -165,7 +303,13 @@ export default {
         deadPartitions: 0,
         numFinishedPartitions: 0,
         state: null,
-        numTotalPartitions: 0
+        numTotalPartitions: 0,
+        completedPartitionMovement: [],
+        pendingPartitionMovement: [],
+        inProgressPartitionMovement: [],
+        abortingPartitionMovement: [],
+        abortedPartitionMovement: [],
+        deadPartitionMovement: []
       }
     }
   },
