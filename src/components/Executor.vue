@@ -335,7 +335,7 @@ export default {
       return this.$helpers.getURL('stop_proposal_execution')
     },
     getPendingPartitionMovements () {
-      if(typeof this.ExecutorState.pendingPartitionMovement === 'undefined') {
+      if (typeof this.ExecutorState.pendingPartitionMovement === 'undefined') {
         return []
       } else {
         return this.ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
@@ -344,11 +344,11 @@ export default {
     getInProgressPartitionMovements () {
       var inprogress = []
       var pending = []
-      if(typeof this.ExecutorState.inProgressPartitionMovement !== 'undefined') {
+      if (typeof this.ExecutorState.inProgressPartitionMovement !== 'undefined') {
         inprogress = this.ExecutorState.inProgressPartitionMovement
       }
 
-      if(typeof this.ExecutorState.pendingPartitionMovement !== 'undefined') {
+      if (typeof this.ExecutorState.pendingPartitionMovement !== 'undefined') {
         pending = this.ExecutorState.pendingPartitionMovement
       }
 
