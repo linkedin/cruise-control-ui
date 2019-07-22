@@ -161,7 +161,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="h in ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')">
+                <tr v-for="h in getPendingPartitionMovements">
                   <td>{{ h.proposal.topicPartition.topic }}</td>
                   <td>{{ h.proposal.topicPartition.partition }}</td>
                   <td>{{ h.proposal.oldReplicas.join(',') }}</td>
@@ -184,7 +184,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="h in ExecutorState.inProgressPartitionMovement.concat(ExecutorState.pendingPartitionMovement.filter(f => f.state === 'IN_PROGRESS'))">
+                <tr v-for="h in getInProgressPartitionMovements">
                   <td>{{ h.proposal.topicPartition.topic }}</td>
                   <td>{{ h.proposal.topicPartition.partition }}</td>
                   <td>{{ h.proposal.oldReplicas.join(',') }}</td>
@@ -333,6 +333,26 @@ export default {
     },
     stopProposalExecutionURL () {
       return this.$helpers.getURL('stop_proposal_execution')
+    },
+    getPendingPartitionMovements () {
+      if(typeof ExecutorState.pendingPartitionMovement === 'undefined') {
+        return []
+      } else {
+        return ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
+      }
+    },
+    getInProgressPartitionMovements () {
+      var inprogress = []
+      var pending = []
+      if(typeof ExecutorState.inProgressPartitionMovement !== 'undefined') {
+        inprogress = ExecutorState.inProgressPartitionMovement
+      }
+
+      if(typeof ExecutorState.pendingPartitionMovement !== 'undefined') {
+        pending = ExecutorState.pendingPartitionMovement
+      }
+
+      inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
     }
   },
   methods: {
