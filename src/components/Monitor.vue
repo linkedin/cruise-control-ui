@@ -123,7 +123,7 @@ export default {
       return this.$helpers.getURL('state', {substates: 'MONITOR', verbose: true})
     },
     bootstrapUrl () {
-      return this.$helpers.getURL('bootstrap', {clearmetrics: true})
+      return this.$helpers.getURL('bootstrap', {clearmetrics: true, start: 0})
     },
     get_action_url () {
       if (this.MonitorState.state === 'PAUSED') {
@@ -188,7 +188,7 @@ export default {
       vm.$http.get(vm.bootstrapUrl, {withCredentials: true}).then((r) => {
         alert('Bootsrtap started, cruise control will now start to read historical metrics to get to ready state, please be patient')
       }, (e) => {
-        alert(e && e.response && e.response.data ? e.response.data : e)
+        alert(e.errorMessage)
       })
     },
     doAction () {
