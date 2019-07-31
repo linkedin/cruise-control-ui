@@ -14,9 +14,7 @@ import Exception from '@/components/Exception'
 import AsyncTask from '@/components/AsyncTask'
 import 'bootstrap/js/dist/dropdown'
 import 'bootswatch/dist/cosmo/bootstrap.css'
-import { ProgressPlugin } from 'bootstrap-vue'
 
-Vue.use(ProgressPlugin)
 Vue.use(Vuex)
 
 Vue.component('exception', Exception)

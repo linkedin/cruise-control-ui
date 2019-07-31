@@ -53,7 +53,9 @@
               </div>
               <div class="card-body">
                 <div v-if='ExecutorState.totalDataToMove'>
-                  <b-progress height="2rem" :value="ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100" max="100" show-progress animated></b-progress>
+                  <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100 + '%''">Done</div>
+                  </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1>
               </div>
@@ -78,7 +80,9 @@
               </div>
               <div class="card-body">
                 <div v-if='ExecutorState.numTotalLeadershipMovements'>
-                  <b-progress height="2rem" :value="ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100" max="100" show-progress animated></b-progress>
+                  <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100 + '%''">Done</div>
+                  </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1>
               </div>
@@ -103,7 +107,10 @@
               </div>
               <div class="card-body">
                 <div v-if='ExecutorState.numTotalPartitionMovements'>
-                  <b-progress height="2rem" :value="ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100" max="100" show-progress animated></b-progress>
+                  <div class="progress">
+                    <div class="progress-bar progress-bar-striped bg-success" :style="'width:' + ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100 + '%''">Done</div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + getInProgressPartitionMovements.length / ExecutorState.numTotalPartitionMovements * 100 + '%''">In Progress</div>
+                  </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1>
               </div>
@@ -146,11 +153,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,11 +176,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,11 +199,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,11 +222,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,11 +245,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -261,11 +268,11 @@
             <table class="table table-sm table-bordered">
               <thead class="thead-light">
                 <tr>
-                  <th>topic</th>
-                  <th>partition</th>
-                  <th>old replica</th>
-                  <th>new replica</th>
-                  <th>movement type</th>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
                 </tr>
               </thead>
               <tbody>
