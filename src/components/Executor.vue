@@ -54,7 +54,7 @@
               <div class="card-body">
                 <div v-if='ExecutorState.totalDataToMove'>
                   <div class="progress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100 + '%''">Done</div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100 + '%'">Done</div>
                   </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1>
@@ -81,7 +81,7 @@
               <div class="card-body">
                 <div v-if='ExecutorState.numTotalLeadershipMovements'>
                   <div class="progress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100 + '%''">Done</div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100 + '%'">Done</div>
                   </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1>
@@ -108,8 +108,8 @@
               <div class="card-body">
                 <div v-if='ExecutorState.numTotalPartitionMovements'>
                   <div class="progress">
-                    <div class="progress-bar progress-bar-striped bg-success" :style="'width:' + ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100 + '%''">Done</div>
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + getInProgressPartitionMovements.length / ExecutorState.numTotalPartitionMovements * 100 + '%''">In Progress</div>
+                    <div class="progress-bar progress-bar-striped bg-success" :style="'width:' + ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100 + '%'">Done</div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + getInProgressPartitionMovements.length / ExecutorState.numTotalPartitionMovements * 100 + '%'">In Progress</div>
                   </div>
                 </div>
                 <h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1>
