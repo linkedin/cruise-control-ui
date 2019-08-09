@@ -30,9 +30,10 @@
         </div>
       </div>
       <div v-if='(/\\*._MOVEMENT_TASK_IN_PROGRESS/.test(ExecutorState.state) || ExecutorState.state === "STOPPING_EXECUTION")' class="card">
-        <div class='card-header'>
-          {{ ExecutorState.state | camelCase }}
-        </div>
+        <div>
+          <div class='card-header'>
+            {{ ExecutorState.state | camelCase }}
+          </div>
         <div class='card-body'>
           <div>
             <button class="btn btn-primary" @click='stopProposalExecution'>Stop Proposal Execution</button>
@@ -47,9 +48,16 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Data To Move</div>
+              <div class="card-header">
+                Total Data To Move
+              </div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1></p>
+                <div v-if='ExecutorState.totalDataToMove'>
+                  <div class="progress" style="height:20px">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.finishedDataMovement / ExecutorState.totalDataToMove * 100 + '%'">Done</div>
+                  </div>
+                </div>
+                <h1 class="text-primary">{{ ExecutorState.totalDataToMove | formatUnits }}</h1>
               </div>
             </div>
             <div class="card">
@@ -67,9 +75,16 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Leadership Movements</div>
+              <div class="card-header">
+                Total Leadership Movements
+              </div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1></p>
+                <div v-if='ExecutorState.numTotalLeadershipMovements'>
+                  <div class="progress" style="height:20px">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + ExecutorState.numFinishedLeadershipMovements / ExecutorState.numTotalLeadershipMovements * 100 + '%'">Done</div>
+                  </div>
+                </div>
+                <h1 class="text-primary">{{ ExecutorState.numTotalLeadershipMovements | formatNumber }}</h1>
               </div>
             </div>
             <div class="card">
@@ -87,9 +102,17 @@
           </div>
           <div class="card-deck mb-3">
             <div class="card">
-              <div class="card-header">Total Partition Movements"</div>
+              <div class="card-header">
+                Total Partition Movements
+              </div>
               <div class="card-body">
-                <p class="card-text"><h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1></p>
+                <div v-if='ExecutorState.numTotalPartitionMovements'>
+                  <div class="progress" style="height:20px">
+                    <div class="progress-bar progress-bar-striped bg-success" :style="'width:' + ExecutorState.numFinishedPartitionMovements / ExecutorState.numTotalPartitionMovements * 100 + '%'">Done</div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="'width:' + getInProgressPartitionMovements.length / ExecutorState.numTotalPartitionMovements * 100 + '%'">In Progress</div>
+                  </div>
+                </div>
+                <h1 class="text-primary">{{ ExecutorState.numTotalPartitionMovements | formatNumber }}</h1>
               </div>
             </div>
             <div class="card">
@@ -124,6 +147,144 @@
                 <p class="card-text"><h1 class="text-info">{{ ExecutorState.deadPartitions }}</h1></p>
               </div>
             </div>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Completed Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.completedPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Pending Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in getPendingPartitionMovements">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>In Progress Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in getInProgressPartitionMovements">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Aborting Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.abortingPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Aborted Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.abortedPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-deck mb-3">
+            <h4>Dead partition Movements</h4>
+            <table class="table table-sm table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Topic</th>
+                  <th>Partition</th>
+                  <th>Old Replica</th>
+                  <th>New Replica</th>
+                  <th>Movement Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in ExecutorState.deadPartitionMovement">
+                  <td>{{ h.proposal.topicPartition.topic }}</td>
+                  <td>{{ h.proposal.topicPartition.partition }}</td>
+                  <td>{{ h.proposal.oldReplicas.join(',') }}</td>
+                  <td>{{ h.proposal.newReplicas.join(',') }}</td>
+                  <td>{{ h.type }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -165,7 +326,13 @@ export default {
         deadPartitions: 0,
         numFinishedPartitions: 0,
         state: null,
-        numTotalPartitions: 0
+        numTotalPartitions: 0,
+        completedPartitionMovement: [],
+        pendingPartitionMovement: [],
+        inProgressPartitionMovement: [],
+        abortingPartitionMovement: [],
+        abortedPartitionMovement: [],
+        deadPartitionMovement: []
       }
     }
   },
@@ -189,6 +356,24 @@ export default {
     },
     stopProposalExecutionURL () {
       return this.$helpers.getURL('stop_proposal_execution')
+    },
+    getPendingPartitionMovements () {
+      if (typeof this.ExecutorState.pendingPartitionMovement === 'undefined') {
+        return []
+      } else {
+        return this.ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
+      }
+    },
+    getInProgressPartitionMovements () {
+      var inprogress = []
+      var pending = []
+      if (typeof this.ExecutorState.inProgressPartitionMovement !== 'undefined') {
+        inprogress = this.ExecutorState.inProgressPartitionMovement
+      }
+      if (typeof this.ExecutorState.pendingPartitionMovement !== 'undefined') {
+        pending = this.ExecutorState.pendingPartitionMovement
+      }
+      return inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
     }
   },
   methods: {
@@ -201,7 +386,7 @@ export default {
     getState () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true, headers: {'Cache-Control': 'no-cache'}}).then((r) => {
+      vm.$http.get(vm.url, {withCredentials: true, headers: {'Cache-Control': 'no-cache', 'Cache-buster': Date.now()}}).then((r) => {
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
