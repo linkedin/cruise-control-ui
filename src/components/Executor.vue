@@ -34,6 +34,7 @@
           <div class='card-header'>
             {{ ExecutorState.state | camelCase }}
           </div>
+        </div>
         <div class='card-body'>
           <div>
             <button class="btn btn-primary" @click='stopProposalExecution'>Stop Proposal Execution</button>
