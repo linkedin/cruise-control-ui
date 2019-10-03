@@ -74,6 +74,12 @@ export default {
       'description': 'Attempts to equalize the leader bytes in rate on each host.'
     },
     {
+      'goal': 'LeaderReplicaDistributionGoal',
+      'hardGoal': false,
+      'group': 1,
+      'description': 'Attempts to maintain an even distribution of any topic\'s leader replicas across the entire cluster.'
+    },
+    {
       'goal': 'TopicReplicaDistributionGoal',
       'hardGoal': false,
       'group': 1,
