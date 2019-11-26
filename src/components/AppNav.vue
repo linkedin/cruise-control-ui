@@ -14,7 +14,7 @@
     </ul>
     <ul class="navbar-nav ml-auto">
       <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" data-toggle='dropdown'>UI Adminstration</a>
+        <a class="nav-link dropdown-toggle" data-toggle='dropdown'>UI Administration</a>
         <div class="dropdown-menu">
           <router-link :to='{"name": "preferences"}' class="dropdown-item" target="_self">&#9881;  Preferences</router-link>
           <a class='dropdown-item' href='#' @click.prevent='refresh()'>⟳ Refresh Config</a>
