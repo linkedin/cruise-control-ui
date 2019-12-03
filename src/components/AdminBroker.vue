@@ -549,7 +549,8 @@
 </template>
 
 <script>
-import xssFilters from 'xss-filters'
+// Disable this due to https://github.com/linkedin/cruise-control-ui/issues/40
+// import xssFilters from 'xss-filters'
 import goals from '@/goals'
 import BrokerState from '@/components/BrokerState'
 
@@ -672,7 +673,9 @@ export default {
           params.concurrent_leader_movements = vm.concurrent_leader_movements
         }
         if (vm.excluded_topics && vm.excluded_topics.length > 0) {
-          params.excluded_topics = xssFilters.uriQueryInHTMLData(vm.excluded_topics)
+          // Disable this due to https://github.com/linkedin/cruise-control-ui/issues/40
+          // params.excluded_topics = xssFilters.uriQueryInDoubleQuotedAttr(vm.excluded_topics)
+          params.excluded_topics = vm.excluded_topics
         }
       }
       if (vm.actionName === 'remove') {
