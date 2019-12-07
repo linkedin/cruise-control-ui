@@ -198,7 +198,9 @@ export default {
     },
     url () {
       let params = {}
-      return this.$helpers.getURL('review', params)
+      # Previously this end point is /review, in later versions its changed to /review_board
+      # See https://github.com/linkedin/cruise-control/blob/3a97169c7a49859cf60675ef37a23e35ed35f30e/docs/wiki/User%20Guide/2-step-verification-for-POST-requests.md
+      return this.$helpers.getURL('review_board', params)
     },
     hideHelperURL () {
       return this.$store.state.hideHelperURL
