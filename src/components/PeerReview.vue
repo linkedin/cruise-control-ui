@@ -117,7 +117,7 @@ export default {
       let vm = this
       vm.loading = true
       vm.selectedIds = []
-      vm.$http.post(vm.url, {withCredentials: true}).then((r) => {
+      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
@@ -197,9 +197,9 @@ export default {
       return this.$helpers.getURL('review', params)
     },
     url () {
-      let params = {}
-      # Previously this end point is /review, in later versions its changed to /review_board
-      # See https://github.com/linkedin/cruise-control/blob/3a97169c7a49859cf60675ef37a23e35ed35f30e/docs/wiki/User%20Guide/2-step-verification-for-POST-requests.md
+      let params = {'json': 'true'}
+      // Previously this end point is /review with POST method, in later versions its changed to /review_board with GET method
+      // See https://github.com/linkedin/cruise-control/blob/3a97169c7a49859cf60675ef37a23e35ed35f30e/docs/wiki/User%20Guide/2-step-verification-for-POST-requests.md
       return this.$helpers.getURL('review_board', params)
     },
     hideHelperURL () {
