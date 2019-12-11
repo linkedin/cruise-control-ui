@@ -4,7 +4,7 @@
     <div class="alert alert-info" v-if='!hideHelperURL'>
       <b>URL ({{group}}, {{cluster}}):</b> <a target=_blank :href='url'>{{ url }}</a>
     </div>
-    <div v-if='!loading && (loaded && !taskId)' class='alert alert-danger'>
+    <div v-if='!loading && loaded && !detectedUserTaskId' class='alert alert-danger'>
       <strong>User-Task-ID</strong> header is not found in the response from the server. If you are using <a target=_blank href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>CORS</a>, please add necessary configuration to your Cruise Control as described <a target=_blank href='https://github.com/linkedin/cruise-control-ui/wiki/CORS-Method'>in this wiki.</a>
     </div>
     <div class="alert alert-primary">
@@ -170,7 +170,8 @@ export default {
       // header & records
       records: [],
       header: [],
-      colUnits: []
+      colUnits: [],
+      detectedUserTaskId: false // true in case the response has user-task-id
     }
   },
   watch: {
@@ -251,6 +252,9 @@ export default {
         }
       }
       vm.$http.get(vm.url, params).then((r) => {
+        // set this so that we know if the server sends user-task-id in the response
+        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
+        // do check the data response
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'

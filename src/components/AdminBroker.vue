@@ -6,7 +6,7 @@
         <button class="btn btn-primary" @click='getKafkaState()'>Refresh Broker Details</button>
       </div>
     </div>
-    <div v-if='!loading && !taskId' class='alert alert-danger'>
+    <div v-if='!loading && !detectedUserTaskId' class='alert alert-danger'>
       <strong>User-Task-ID</strong> header is not found in the response from the server. If you are using <a target=_blank href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>CORS</a>, please add necessary configuration to your Cruise Control as described <a target=_blank href='https://github.com/linkedin/cruise-control-ui/wiki/CORS-Method'>in this wiki.</a>
     </div>
     <div v-if='error'>
@@ -614,7 +614,8 @@ export default {
       dryrun: true, // part of URL
       posted: false, // true if a POST method is made
       posturl: null, // POST url
-      postResponse: '' // POST response from server
+      postResponse: '', // POST response from server
+      detectedUserTaskId: false // true in case the response has user-task-id
     }
   },
   created () {
@@ -847,6 +848,9 @@ export default {
         }
       }
       this.$http.post(vm.actionURL, params).then((r) => {
+        // set this so that we know if the server sends user-task-id in the response
+        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
+        // store this task in local cache for future follow-up
         let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
         vm.$store.commit('setTaskId', {url: vm.actionURL, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
         vm.posted = true
@@ -864,6 +868,9 @@ export default {
       let url = vm.$helpers.getURL('kafka_cluster_state')
       // console.log(url)
       this.$http.get(url, {withCredentials: true}).then((r) => {
+        // set this so that we know if the server sends user-task-id in the response
+        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
+        // do verify the state
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
