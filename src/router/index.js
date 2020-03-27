@@ -20,6 +20,7 @@ import UserTasks from '@/components/UserTasks'
 import ConfigInsights from '@/components/ConfigInsights'
 import PeerReview from '@/components/PeerReview'
 import store from '@/store'
+import Summary from '@/components/Summary'
 
 Vue.use(Router)
 
@@ -31,6 +32,11 @@ export default new Router({
       name: 'main',
       path: '/',
       redirect: '/a/b'
+    },
+    {
+      name: 'summary',
+      path: '/summary',
+      component: Summary
     },
     {
       name: 'preferences',

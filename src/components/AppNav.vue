@@ -4,6 +4,7 @@
     <a href="#" target="_self" class="navbar-brand">
         <img height=48 src="/static/cc-logo.png" alt="LinkedIn Kafka Cruise Control Frontend" />
     </a>
+    <router-link class="navbar-item" :to='{name: "summary"}'>Summary</router-link>
     <ul class="navbar-nav">
       <li class="nav-item dropdown" v-for="(groupm, forgroup) in groups" :key="forgroup">
         <a class="nav-link dropdown-toggle" data-toggle='dropdown'>{{ forgroup }}</a>
