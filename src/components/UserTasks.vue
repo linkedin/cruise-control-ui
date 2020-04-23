@@ -51,6 +51,7 @@
 
 <script>
 import BooleanEL from '@/components/BooleanEL'
+const sortBy = require('lodash.sortby')
 
 export default {
   name: 'UserTasks',
@@ -127,7 +128,7 @@ export default {
       return this.$helpers.getURL('user_tasks')
     },
     sortedTasks () {
-      return this.$lodash.sortBy(this.tasks, this.sortColumn)
+      return sortBy(this.tasks, this.sortColumn)
     }
   }
 }

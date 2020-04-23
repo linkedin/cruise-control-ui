@@ -59,6 +59,8 @@
 
 <script>
 import BrokerState from '@/components/BrokerState'
+const sortBy = require('lodash.sortby')
+
 export default {
   name: 'BrokerLoad',
   props: {
@@ -82,7 +84,7 @@ export default {
   },
   computed: {
     sortedBrokers () {
-      return this.$lodash.sortBy(this.brokers, this.sortColumn)
+      return sortBy(this.brokers, this.sortColumn)
     },
     apiMinorVersion () {
       // NnwOutRate has been changed to NwOutRate and Upstream

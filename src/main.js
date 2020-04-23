@@ -5,7 +5,6 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import Axios from 'axios'
-import Lodash from 'lodash'
 import App from './App'
 import Api from './api'
 import router from './router'
@@ -22,7 +21,6 @@ Vue.component('async-task', AsyncTask)
 
 Vue.prototype.$http = Axios
 Vue.prototype.$helpers = Api
-Vue.prototype.$lodash = Lodash
 Vue.config.productionTip = false
 
 // disk is already in MB

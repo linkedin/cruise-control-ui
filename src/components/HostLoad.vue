@@ -57,6 +57,8 @@
 </template>
 
 <script>
+const sortBy = require('lodash.sortby')
+
 export default {
   name: 'HostLoad',
   props: {
@@ -79,7 +81,7 @@ export default {
   },
   computed: {
     sortedHosts () {
-      return this.$lodash.sortBy(this.hosts, this.sortColumn)
+      return sortBy(this.hosts, this.sortColumn)
     },
     apiMinorVersion () {
       // NnwOutRate has been changed to NwOutRate and Upstream
