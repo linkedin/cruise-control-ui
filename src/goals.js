@@ -8,6 +8,12 @@ export default {
       'description': 'Ensures that all replicas of each partition are assigned in a rack aware manner -- i.e. no more than one replica of each partition resides in the same rack.'
     },
     {
+      'goal': 'RackAwareDistributionGoal',
+      'hardGoal': true,
+      'group': 1,
+      'description': 'A relaxed version of RackAwareGoal to use in clusters with partitions whose replication factor > number of racks.'
+    },
+    {
       'goal': 'ReplicaCapacityGoal',
       'hardGoal': true,
       'group': 1,
