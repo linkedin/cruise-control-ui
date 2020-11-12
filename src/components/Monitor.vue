@@ -186,7 +186,7 @@ export default {
     bootstrapMetrics () {
       const vm = this
       vm.$http.get(vm.bootstrapUrl, {withCredentials: true}).then((r) => {
-        alert('Bootsrtap started, cruise control will now start to read historical metrics to get to ready state, please be patient')
+        alert('Bootstrap started, cruise control will now start to read historical metrics to get to ready state, please be patient')
       }, (e) => {
         alert(e.response.data.errorMessage)
       })
