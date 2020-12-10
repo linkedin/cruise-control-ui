@@ -15,6 +15,9 @@ export default new Vuex.Store({
     online: true,
     autoReloadEnabled: false, // disabled by default
     autoReloadInterval: 30000, // 30 seconds
+    charts: {
+      enabled: true
+    },
     // these control the enablement of a module in cruise control
     modules: {
       state: true,

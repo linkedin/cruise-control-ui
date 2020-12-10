@@ -94,7 +94,6 @@
   </div>
 </template>
 
-
 <script>
 import LineChart from '@/components/LineChart.vue'
 const backgroundColors = ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58']
@@ -103,7 +102,9 @@ class Topic {
   constructor () {
     this.leaders = {}
     this.replicas = {}
+    this.cpu = {}
     this.replicationFactor = 0
+    this.disk = 0
   }
 
   addLeader (item) {
@@ -124,14 +125,35 @@ class Topic {
         this.replicas[follower] = 1
         return
       }
-
       this.replicas[follower]++
     })
+  }
+
+  countCpu (item) {
+    if (this.cpu[item.leader] === undefined) {
+      this.cpu[item.leader] = item.cpu
+      return
+    }
+    this.cpu[item.leader] += item.cpu
+  }
+
+  countDisk (item) {
+    let replicationFactor = item.followers.length + 1
+    this.disk += item.disk * replicationFactor
+  }
+
+  getSize () {
+    let decimals = 2
+    if (this.disk === 0) return '0 MiB'
+    const k = 1024
+    const sizes = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
+    const i = Math.floor(Math.log(this.disk) / Math.log(k))
+    return parseFloat((this.disk / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i]
   }
 }
 
 export default {
-  name: 'ResourceDistribution',
+  name: 'ResourceDistributionChart',
   components: {
     LineChart
   },
@@ -182,6 +204,8 @@ export default {
       }
       this.cachedKccData.get(item.topic).addLeader(item)
       this.cachedKccData.get(item.topic).addReplicas(item)
+      this.cachedKccData.get(item.topic).countCpu(item)
+      this.cachedKccData.get(item.topic).countDisk(item)
       this.cachedKccData.get(item.topic).replicationFactor = Math.max(this.cachedKccData.get(item.topic).replicationFactor, item.followers.length + 1)
     },
     fetchKccData () {
@@ -189,7 +213,6 @@ export default {
       this.$http
         .get(this.$helpers.getURL('partitionload', {}))
         .then(response => {
-          this.rawresponse = response
           let brokerList = new Set()
           for (let record of response.data.records) {
             this.cacheKccDataItem(record)
@@ -215,7 +238,7 @@ export default {
       }
     },
     formatItemOptions (item) {
-      let title = `${item[0]} (RF ${item[1].replicationFactor})`
+      let title = `${item[0]} (RF ${item[1].replicationFactor}, ${item[1].getSize()})`
       return this.getOptions(title)
     },
     getOptions (title) {
