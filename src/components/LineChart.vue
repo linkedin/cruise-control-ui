@@ -9,6 +9,12 @@ export default {
   mounted () {
     // Overwriting base render method with actual data.
     this.renderChart(this.chartData, this.options)
+  },
+  watch: {
+    options: function () {
+      this.$data._chart.options = this.options
+      this.$data._chart.update()
+    }
   }
 }
 </script>

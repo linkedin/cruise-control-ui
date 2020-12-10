@@ -6,7 +6,7 @@
 
     <div class="col-5 mx-auto">
       <div class="row">
-        <div class="col-8 mx-auto">
+        <div class="col-8 mx-auto my-auto">
           <input
             type="text"
             class="form-control"
@@ -26,6 +26,28 @@
             <label class="form-check-label" for="stackedCheckBox">
               Stacked view
             </label>
+          </div>
+          <div class="dropdown">
+            <button
+              class="btn btn-secondary btn-sm dropdown-toggle"
+              type="button"
+              data-toggle="dropdown"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              display: {{ resource }}
+            </button>
+            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+              <a class="dropdown-item" href="#" @click="setResource('leaders')"
+                >Leaders</a
+              >
+              <a class="dropdown-item" href="#" @click="setResource('replicas')"
+                >Replicas</a
+              >
+              <a class="dropdown-item" href="#" @click="setResource('cpu')"
+                >CPU</a
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -62,7 +84,7 @@
         <div class="card mt-4">
           <div class="card-inner">
             <LineChart
-              :chart-data="formatItemData(item, 'leaders')"
+              :chart-data="formatItemData(item)"
               :options="formatItemOptions(item)"
             ></LineChart>
           </div>
@@ -113,12 +135,15 @@ export default {
   components: {
     LineChart
   },
+
   props: {
     group: String,
     cluster: String
   },
+
   data () {
     return {
+      resource: 'leaders',
       stacked: false,
       filter: '',
       loaded: 0,
@@ -131,6 +156,7 @@ export default {
   beforeMount () {
     this.argsChanged()
   },
+
   watch: {
     group: function (ogroup, ngroup) {
       this.argsChanged()
@@ -142,6 +168,7 @@ export default {
 
   mounted () {
     this.fetchKccData()
+    this.moptions = this.getOptions('test')
   },
 
   methods: {
@@ -149,7 +176,6 @@ export default {
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
       this.$store.commit('seturl', newurl)
     },
-
     cacheKccDataItem (item) {
       if (!this.cachedKccData.has(item.topic)) {
         this.cachedKccData.set(item.topic, new Topic())
@@ -158,7 +184,6 @@ export default {
       this.cachedKccData.get(item.topic).addReplicas(item)
       this.cachedKccData.get(item.topic).replicationFactor = Math.max(this.cachedKccData.get(item.topic).replicationFactor, item.followers.length + 1)
     },
-
     fetchKccData () {
       this.cachedKccData = new Map()
       this.$http
@@ -179,23 +204,20 @@ export default {
           this.error = error
         })
     },
-
-    formatItemData (item, resource) {
-      let leaders = item[1].leaders
+    formatItemData (item) {
+      let resources = item[1][this.resource]
       return {
         datasets: [{
-          data: [...Object.values(leaders)],
+          data: [...Object.values(resources)],
           backgroundColor: 'rgba(7, 66, 160, 0.5)'
         }],
-        labels: [...Object.keys(leaders)].map(e => 'broker ' + e)
+        labels: [...Object.keys(resources)].map(e => 'broker ' + e)
       }
     },
-
     formatItemOptions (item) {
       let title = `${item[0]} (RF ${item[1].replicationFactor})`
       return this.getOptions(title)
     },
-
     getOptions (title) {
       let options = {
         legend: {
@@ -208,7 +230,7 @@ export default {
               stepSize: 1
             },
             scaleLabel: {
-              labelString: 'nb leaders',
+              labelString: this.resource === 'cpu' ? '% cpu' : `nb ${this.resource}`,
               display: true
             }
           }]
@@ -219,11 +241,14 @@ export default {
         }
       }
       return options
+    },
+    setResource (resource) {
+      this.resource = resource
     }
-
   },
+
   computed: {
-    formatStackedData (resource) {
+    formatStackedData () {
       let stackedKccData = {
         labels: this.brokerList,
         datasets: []
@@ -243,7 +268,7 @@ export default {
         counter++
         counter = counter % backgroundColors.length
         for (let broker of this.brokerList) {
-          let value = (topic[1].leaders[broker] !== undefined) ? topic[1].leaders[broker] : 0
+          let value = (topic[1][this.resource][broker] !== undefined) ? topic[1][this.resource][broker] : 0
           dataset.data.push(value)
         }
         stackedKccData.datasets.push(dataset)
@@ -253,9 +278,10 @@ export default {
     },
 
     getStackedOptions () {
-      let options = this.getOptions('stacked leaders')
+      let options = this.getOptions(`stacked ${this.resource} view`)
       options.scales.xAxes = [{ stacked: true }]
       options.scales.yAxes[0].stacked = true
+      options.scales.yAxes[0].scaleLabel.labelString = this.resource === 'cpu' ? '% cpu' : `nb ${this.resource}`
       options.legend = {
         display: true,
         position: 'bottom'
