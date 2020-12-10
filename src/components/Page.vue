@@ -41,6 +41,9 @@
           <li class="nav-item" v-if='modules.user_tasks'>
           <router-link class="nav-link" :to='{"name": "page.user_tasks", params: { group: group, cluster: cluster } }'>Cruise Control Tasks</router-link>
           </li>
+          <li class="nav-item" v-if='modules.user_tasks'>
+          <router-link class="nav-link" :to='{"name": "page.resource_distributions", params: { group: group, cluster: cluster } }'>Resource distributions</router-link>
+          </li>
           <!--
           <li class="nav-item" v-if='modules.admin_state'>
             <router-link :to='{"name": "page.admin_state", params: { group: group, cluster: cluster, embed: true } }'>&#9881; Sampling Admin</router-link>
