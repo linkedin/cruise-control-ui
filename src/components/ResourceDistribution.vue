@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="text-center">
-      Current leadership distribution across brokers per topic
+      {{ resource }} distribution across brokers per topic in cluster {{ cluster }} ({{ group }})
     </h1>
 
     <div class="col-5 mx-auto">
@@ -15,7 +15,7 @@
             :disabled="stacked"
           />
         </div>
-        <div class="col-4 mx-auto">
+        <div class="col-4">
           <div class="form-check">
             <input
               v-model="stacked"
@@ -29,7 +29,7 @@
           </div>
           <div class="dropdown">
             <button
-              class="btn btn-secondary btn-sm dropdown-toggle"
+              class="btn btn-outline-primary btn-sm dropdown-toggle"
               type="button"
               data-toggle="dropdown"
               aria-haspopup="true"
@@ -57,11 +57,16 @@
       {{ error }}
     </div>
 
-    <div class="row" v-bind:class="{ active: loaded }" v-show="stacked">
+    <div class="row" v-show="stacked">
       <div class="col-8 mx-auto">
         <div class="card mx-4 mt-4">
-          <div class="card-inner">
+          <div class="card-inner" style="height:500px;">
             <LineChart
+              v-bind:style="{
+                height: '100%',
+                width: '100%',
+                position: 'relative'
+              }"
               :chart-data="formatStackedData"
               :options="getStackedOptions"
             ></LineChart>
@@ -72,7 +77,6 @@
 
     <div
       class="row mx-auto"
-      v-bind:class="{ active: loaded }"
       v-show="!stacked"
     >
       <div
@@ -96,7 +100,6 @@
 
 <script>
 import LineChart from '@/components/LineChart.vue'
-const backgroundColors = ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58']
 
 class Topic {
   constructor () {
@@ -168,7 +171,6 @@ export default {
       resource: 'leaders',
       stacked: false,
       filter: '',
-      loaded: 0,
       cachedKccData: null,
       error: null,
       brokerList: []
@@ -221,7 +223,7 @@ export default {
           this.brokerList = [...brokerList].sort()
         })
         .then(e => {
-          this.loaded++
+          this.cachedKccData = new Map([...this.cachedKccData.entries()].sort().reverse())
         })
         .catch(error => {
           this.error = error
@@ -238,7 +240,7 @@ export default {
       }
     },
     formatItemOptions (item) {
-      let title = `${item[0]} (RF ${item[1].replicationFactor}, ${item[1].getSize()})`
+      let title = `${item[0]} (RF ${item[1].replicationFactor}, size ${item[1].getSize()})`
       return this.getOptions(title)
     },
     getOptions (title) {
@@ -249,8 +251,7 @@ export default {
         scales: {
           yAxes: [{
             ticks: {
-              beginAtZero: true,
-              stepSize: 1
+              beginAtZero: true
             },
             scaleLabel: {
               labelString: this.resource === 'cpu' ? '% cpu' : `nb ${this.resource}`,
@@ -286,10 +287,10 @@ export default {
         let dataset = {
           label: topic[0],
           data: [],
-          backgroundColor: backgroundColors[counter]
+          backgroundColor: this.$store.state.chartColors[counter]
         }
         counter++
-        counter = counter % backgroundColors.length
+        counter = counter % this.$store.state.chartColors.length
         for (let broker of this.brokerList) {
           let value = (topic[1][this.resource][broker] !== undefined) ? topic[1][this.resource][broker] : 0
           dataset.data.push(value)
@@ -305,6 +306,8 @@ export default {
       options.scales.xAxes = [{ stacked: true }]
       options.scales.yAxes[0].stacked = true
       options.scales.yAxes[0].scaleLabel.labelString = this.resource === 'cpu' ? '% cpu' : `nb ${this.resource}`
+      options.maintainAspectRatio = false
+      options.responsive = true
       options.legend = {
         display: true,
         position: 'bottom'

@@ -41,7 +41,7 @@
           <li class="nav-item" v-if='modules.user_tasks'>
           <router-link class="nav-link" :to='{"name": "page.user_tasks", params: { group: group, cluster: cluster } }'>Cruise Control Tasks</router-link>
           </li>
-          <li class="nav-item" v-if='charts.enabled'>
+          <li class="nav-item" v-if='modules.chart_page'>
           <router-link class="nav-link" :to='{"name": "page.resource_distributions", params: { group: group, cluster: cluster } }'>Resource distributions</router-link>
           </li>
           <!--
@@ -76,8 +76,7 @@ export default {
   },
   data () {
     return {
-      modules: this.$store.state.modules,
-      charts: this.$store.state.charts
+      modules: this.$store.state.modules
     }
   },
   computed: {
