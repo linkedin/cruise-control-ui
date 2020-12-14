@@ -1,8 +1,11 @@
 <template>
   <div>
     <h1 class="text-center">
-      {{ resource }} distribution across brokers per topic in cluster {{ cluster }} ({{ group }})
+      Cluster {{ cluster }} ({{ group }})
     </h1>
+    <h2 class="text-center">
+      {{ resource }} distribution across brokers per topic
+    </h2>
 
     <div class="col-5 mx-auto">
       <div class="row">
@@ -150,7 +153,12 @@ class Topic {
     if (this.disk === 0) return '0 MiB'
     const k = 1024
     const sizes = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
-    const i = Math.floor(Math.log(this.disk) / Math.log(k))
+    let i
+    if (this.disk <= 1) {
+      i = 0
+    } else {
+      i = Math.floor(Math.log(this.disk) / Math.log(k))
+    }
     return parseFloat((this.disk / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i]
   }
 }
@@ -223,7 +231,12 @@ export default {
           this.brokerList = [...brokerList].sort()
         })
         .then(e => {
-          this.cachedKccData = new Map([...this.cachedKccData.entries()].sort().reverse())
+          this.cachedKccData = new Map([...this.cachedKccData.entries()].sort((a, b) => {
+            if (a[1].disk > b[1].disk) {
+              return -1
+            }
+            return 1
+          }))
         })
         .catch(error => {
           this.error = error
