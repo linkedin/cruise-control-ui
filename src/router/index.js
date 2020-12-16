@@ -18,6 +18,7 @@ import AdminBroker from '@/components/AdminBroker'
 import AdminSampling from '@/components/AdminSampling'
 import UserTasks from '@/components/UserTasks'
 import ConfigInsights from '@/components/ConfigInsights'
+import ResourceDistribution from '@/components/ResourceDistribution'
 import PeerReview from '@/components/PeerReview'
 import store from '@/store'
 import Summary from '@/components/Summary'
@@ -128,6 +129,12 @@ export default new Router({
           name: 'page.admin_state',
           path: 'admin_state',
           component: AdminSampling,
+          props: true
+        },
+        {
+          name: 'page.resource_distributions',
+          path: 'resource_distributions',
+          component: ResourceDistribution,
           props: true
         },
         {
