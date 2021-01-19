@@ -30,7 +30,7 @@ Vue.filter('formatUnits', function (v) {
   for (var i = 0; i < units.length; i++) {
     if (v <= Math.pow(1024, i + 1)) {
       var value = v / Math.pow(1024, i)
-      value = value.toFixed(0)
+      value = value.toFixed(2)
       return value + ' ' + units[i]
     }
   }
