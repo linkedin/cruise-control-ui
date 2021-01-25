@@ -239,7 +239,7 @@ export default {
           }))
         })
         .catch(error => {
-          this.error = error
+          this.error = error.response.data
         })
     },
     formatItemData (item) {
