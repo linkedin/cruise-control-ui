@@ -12,7 +12,7 @@
     "lint": "test -d cruise-control-ui && cd cruise-control-ui; eslint --ext .js,.vue src"
   },
   "dependencies": {
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "bootstrap": "^4.4.1",
     "bootswatch": "^4.4.1",
     "build-url": "^1.0.10",
