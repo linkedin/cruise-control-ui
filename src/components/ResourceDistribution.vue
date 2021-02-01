@@ -41,13 +41,13 @@
               display: {{ resource }}
             </button>
             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              <a class="dropdown-item" href="#" @click="setResource('leaders')"
+              <a class="dropdown-item" @click.prevent="setResource('leaders')"
                 >Leaders</a
               >
-              <a class="dropdown-item" href="#" @click="setResource('replicas')"
+              <a class="dropdown-item" @click.prevent="setResource('replicas')"
                 >Replicas</a
               >
-              <a class="dropdown-item" href="#" @click="setResource('cpu')"
+              <a class="dropdown-item" @click.prevent="setResource('cpu')"
                 >CPU</a
               >
             </div>
