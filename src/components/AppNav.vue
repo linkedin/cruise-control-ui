@@ -2,7 +2,7 @@
 <template>
   <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
     <a href="#" target="_self" class="navbar-brand">
-        <img height=48 src="/static/cc-logo.png" alt="LinkedIn Kafka Cruise Control Frontend" />
+        <img height=48 :src="cclogo" alt="LinkedIn Kafka Cruise Control Frontend" />
     </a>
     <router-link class="navbar-item" :to='{name: "summary"}'>Summary</router-link>
     <ul class="navbar-nav">
@@ -28,6 +28,7 @@
 
 <script>
 import xssFilters from 'xss-filters'
+import cclogo from '../assets/images/cc-logo.png'
 
 export default {
   name: 'AppNav',
@@ -43,7 +44,8 @@ export default {
         cluster: null,
         url: null
       },
-      csvTimer: null
+      csvTimer: null,
+      cclogo: cclogo
     }
   },
   methods: {
