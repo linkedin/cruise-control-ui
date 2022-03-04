@@ -21,7 +21,7 @@
     "lodash.sortby": "^4.7.0",
     "moment": "^2.18.1",
     "popper.js": "^1.16.1",
-    "url-parse": "^1.5.6",
+    "url-parse": "^1.5.9",
     "vue": "^2.6.11",
     "vue-axios": "^2.1.5",
     "vue-chartjs": "^3.5.1",
