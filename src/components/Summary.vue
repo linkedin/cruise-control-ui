@@ -51,7 +51,8 @@ export default {
   },
   methods: {
     stats_url (endpoint) {
-      return endpoint + '/kafka_cluster_state?json=true'
+      let params = {'json': 'true'}
+      return this.$helpers.getURL('kafka_cluster_state', params)
     }
   },
   data () {
