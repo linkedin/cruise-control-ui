@@ -81,7 +81,7 @@ export default {
     getKafkaState () {
       const vm = this
       vm.loading = true
-      let url = this.url + 'kafka_cluster_state'
+      let url = this.url + (this.url.endsWith('/') ? 'kafka_cluster_state' : '/kafka_cluster_state')
       vm.req = vm.$http.get(url, {params: {json: true}, withCredentials: true}).then((r) => {
         if (r.data === null || r.data === undefined || r.data === '') {
           vm.error = true
