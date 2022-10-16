@@ -29,7 +29,7 @@ In addition to these there is support for these common features
 6. Display Full Stack Trace responses from Cruise Control instead of shorter ones.
 7. Customizable Look & Feel via theming
 
-Documenation
+Documentation
 =============
 
 Application Screnshots & How-to Guides are available in the [wiki](https://github.com/linkedin/cruise-control-ui/wiki).
