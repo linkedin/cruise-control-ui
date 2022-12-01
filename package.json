@@ -30,7 +30,7 @@
     "xss-filters": "^1.2.7"
   },
   "devDependencies": {
-    "autoprefixer": "^7.1.2",
+    "autoprefixer": "^10.4.13",
     "babel-core": "^6.22.1",
     "babel-eslint": "^7.1.1",
     "babel-loader": "^7.1.1",
@@ -65,7 +65,7 @@
     "shelljs": "^0.8.5",
     "style-loader": "^0.18.2",
     "url-loader": "^1.1.2",
-    "vue-loader": "^13.0.4",
+    "vue-loader": "^17.0.1",
     "vue-style-loader": "^3.0.1",
     "vue-template-compiler": "^2.6.11",
     "webpack": "^2.6.1",
