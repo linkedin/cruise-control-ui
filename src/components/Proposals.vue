@@ -31,7 +31,7 @@
             <th>Number of Replica Movements</th>
             <th>Number of Leader Movements</th>
             <th>Recent Windows</th>
-            <th>Data to Move (MB)</th>
+            <th>Data to Move</th>
             <th>Monitored Partitions Coverage</th>
           </tr>
         </thead>
@@ -40,7 +40,7 @@
             <td>{{ numReplicaMovements }}</td>
             <td>{{ numLeaderMovements }}</td>
             <td>{{ recentWindows }}</td>
-            <td>{{ dataToMoveMB }}</td>
+            <td>{{ dataToMoveMB | formatUnits }}</td>
             <td>{{ monitoredPartitionsPercentage ? monitoredPartitionsPercentage.toFixed(2) : null }}%</td>
           </tr>
         </tbody>
