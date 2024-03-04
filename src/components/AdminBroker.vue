@@ -538,6 +538,28 @@
         <div v-if='posted'>
           <div v-if='postResponse'>
             <button class="btn btn-info" @click='clearPostResponse'>Clear Response</button>
+              <div v-if='dataParsed'>
+              <table class="table table-sm table-bordered">
+                <thead class="thead-light">
+                <tr>
+                  <th>Number of Replica Movements</th>
+                  <th>Number of Leader Movements</th>
+                  <th>Recent Windows</th>
+                  <th>Data to Move</th>
+                  <th>Monitored Partitions Coverage</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                  <td>{{ numReplicaMovements }}</td>
+                  <td>{{ numLeaderMovements }}</td>
+                  <td>{{ recentWindows }}</td>
+                  <td>{{ dataToMoveMB | formatUnits }}</td>
+                  <td>{{ monitoredPartitionsPercentage ? monitoredPartitionsPercentage.toFixed(2) : null }}%</td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
             <exception :exception='postResponse'></exception>
           </div>
           <div class='alert alert-success' v-else>
@@ -615,6 +637,13 @@ export default {
       posted: false, // true if a POST method is made
       posturl: null, // POST url
       postResponse: '', // POST response from server
+      // top level medatadata
+      dataParsed: false,
+      numReplicaMovements: null,
+      recentWindows: null,
+      dataToMoveMB: null,
+      monitoredPartitionsPercentage: null,
+      numLeaderMovements: null,
       detectedUserTaskId: false // true in case the response has user-task-id
     }
   },
@@ -823,6 +852,12 @@ export default {
     clearPostResponse () {
       this.posted = false
       this.postResponse = ''
+      this.numReplicaMovements = null
+      this.recentWindows = null
+      this.dataParsed = false
+      this.dataToMoveMB = null
+      this.monitoredPartitionsPercentage = null
+      this.numLeaderMovements = null
     },
     argsChanged () {
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
@@ -855,6 +890,14 @@ export default {
         vm.$store.commit('setTaskId', {url: vm.actionURL, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
         vm.posted = true
         vm.postResponse = r.data
+        // parse data for summary:
+        // top level metadata in the response
+        vm.dataParsed = true
+        vm.numReplicaMovements = r.data.summary.numReplicaMovements
+        vm.recentWindows = r.data.summary.recentWindows
+        vm.dataToMoveMB = r.data.summary.dataToMoveMB
+        vm.monitoredPartitionsPercentage = r.data.summary.monitoredPartitionsPercentage
+        vm.numLeaderMovements = r.data.summary.numLeaderMovements
       }, (e) => {
         vm.posted = true
         vm.postResponse = e && e.response ? e.response.data : e
