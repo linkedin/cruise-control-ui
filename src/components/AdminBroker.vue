@@ -247,6 +247,12 @@
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
                 </div>
               </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+                </div>
+              </div>
             </div>
           </div>
           </template>
@@ -261,31 +267,38 @@
       <div class="alert alert-warning" v-if='selectedBrokers.length > 0 && actionName === "demote"'>
         <h5>Demote Broker Flags</h5>
         <hr>
-        <div class="row">
-          <div class="col-md-4">
-            <div class="form-inline">
-              <label class="form-label"> Concurrent Leader Movements </label>
-              <input type="number" class="form-input" v-model='concurrent_leader_movements' placeholder='(CC Default)'>
+        <form>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" v-model='dryrun'>
+            <label class="form-check-label">DryRun</label>
+          </div>
+          <hr>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-inline">
+                <label class="form-label"> Concurrent Leader Movements </label>
+                <input type="number" class="form-input" v-model='concurrent_leader_movements' placeholder='(CC Default)'>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-inline">
+                <label class="form-label">Replication Throttle (bytes per second):</label>
+                <input class="form-input" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" v-model='disallow_capacity_estimation'>
+                <label class="form-check-label">
+                  Disallow Capacity Estimation
+                </label>
+              </div>
             </div>
           </div>
-          <div class="col-md-3">
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="checkbox" v-model='disallow_capacity_estimation'>
-              <label class="form-check-label">
-                Disallow Capacity Estimation
-              </label>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="checkbox" v-model='dryrun'>
-              <label class="form-check-label">DryRun</label>
-            </div>
-          </div>
-          <div class="col-md-2">
+          <div class="text-right">
             <button @click='actionBroker' class="btn btn-primary">Demote Brokers {{ selectedBrokers }}</button>
           </div>
-        </div>
+        </form>
       </div>
 
       <!-- Remove Broker Flags -->
@@ -398,6 +411,12 @@
                 <label class="col-sm-6">Concurrent Leader Movements:</label>
                 <div class="col-sm-6">
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
                 </div>
               </div>
             </div>
@@ -521,6 +540,12 @@
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
                 </div>
               </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+                </div>
+              </div>
             </div>
           </div>
           </template>
@@ -607,6 +632,7 @@ export default {
       excluded_topics: '', // Check CC Documentation
       concurrent_partition_movements_per_broker: null, // Check CC Documentation
       concurrent_leader_movements: null, // Check CC Documentation
+      replication_throttle: null, // Check CC Documentation
       throttle_removed_broker: false, // Check CC Documentation
       throttle_added_broker: false, // Check CC Documentation
       // workflow
@@ -644,6 +670,12 @@ export default {
         if (vm.disallow_capacity_estimation) {
           params.allow_capacity_estimation = !vm.disallow_capacity_estimation
         }
+        if (vm.concurrent_leader_movements) {
+          params.concurrent_leader_movements = vm.concurrent_leader_movements
+        }
+        if (vm.replication_throttle) {
+          params.replication_throttle = vm.replication_throttle
+        }
       }
       if (vm.actionName === 'remove' || vm.actionName === 'add' || vm.actionName === 'rebalance') {
         if (vm.goals1.length > 0) {
@@ -673,6 +705,9 @@ export default {
         if (vm.concurrent_leader_movements) {
           params.concurrent_leader_movements = vm.concurrent_leader_movements
         }
+        if (vm.replication_throttle) {
+          params.replication_throttle = vm.replication_throttle
+        }
         if (vm.excluded_topics && vm.excluded_topics.length > 0) {
           // Disable this due to https://github.com/linkedin/cruise-control-ui/issues/40
           // params.excluded_topics = xssFilters.uriQueryInDoubleQuotedAttr(vm.excluded_topics)
@@ -693,6 +728,7 @@ export default {
         //  &concurrent_partition_movements_per_broker=[concurrency]
         //  &concurrent_leader_movements=[concurrency]
         //  &throttle_removed_broker=[true/false]
+        //  &replication_throttle=[throttle]
         //  &json=[true/false]
         if (vm.throttle_removed_broker) {
           params.throttle_removed_broker = params.throttle_removed_broker
@@ -706,6 +742,7 @@ export default {
         //  &json=[true/false]
         //  &allow_capacity_estimation=[true/false]
         //  &concurrent_leader_movements=[concurrency]
+        //  &replication_throttle=[throttle]
         return vm.$helpers.getURL('demote_broker', params)
       }
       if (vm.actionName === 'add') {
@@ -723,6 +760,7 @@ export default {
         //  &skip_hard_goal_check=[true/false]
         //  &excluded_topics=[TOPICS]
         //  &use_ready_default_goals=[true/false]
+        //  &replication_throttle=[throttle]
         if (vm.throttle_added_broker) {
           params.throttle_added_broker = vm.throttle_added_broker
         }
@@ -748,6 +786,7 @@ export default {
         //  &concurrent_partition_movements_per_broker=[concurrency]
         //  &concurrent_leader_movements=[concurrency]
         //  &excluded_topics=[TOPICS]
+        //  &replication_throttle=[throttle]
         return vm.$helpers.getURL('rebalance', params)
       }
       if (vm.actionName === 'rebalance_disk') {
