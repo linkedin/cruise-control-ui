@@ -12,11 +12,11 @@
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>
-    <div v-if='async'>
+    <div v-else-if='async'>
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if='!loaded && loading'>
-      <p>Loading ...</p>
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else>
 
@@ -29,7 +29,7 @@
               <td>
                 <b v-if='AnomalyDetectorState.selfHealingDisabled.length == 0'>None</b>
                 <ul v-else class="list-group">
-                  <li class="list-group-item" v-for='d in AnomalyDetectorState.selfHealingDisabled'>{{ d }}</li>
+                  <li class="list-group-item" v-for='(d, idx) in AnomalyDetectorState.selfHealingDisabled' :key='idx'>{{ d }}</li>
                 </ul>
               </td>
             </tr>
@@ -38,7 +38,7 @@
               <td>
                 <b v-if='AnomalyDetectorState.selfHealingEnabled.length == 0'>None</b>
                 <ul v-else class="list-group">
-                  <li class="list-group-item" v-for='d in AnomalyDetectorState.selfHealingEnabled'>{{ d }}</li>
+                  <li class="list-group-item" v-for='(d, idx) in AnomalyDetectorState.selfHealingEnabled' :key='idx'>{{ d }}</li>
                 </ul>
               </td>
             </tr>
@@ -56,11 +56,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for='r in AnomalyDetectorState.recentBrokerFailures'>
+            <tr v-for='(r, ridx) in AnomalyDetectorState.recentBrokerFailures' :key='ridx'>
               <td>{{ r.detectionMs | formatLocalTime }} ago</td>
               <td>
                 <ul class="list-group">
-                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(time, broker) in r.failedBrokersByTimeMs">
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(time, broker) in r.failedBrokersByTimeMs" :key='broker'>
                     {{ broker }}
                     <span class="badge badge-primary badge-pill">{{ time | formatLocalTime }} ago</span>
                   </li>
@@ -81,24 +81,24 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in AnomalyDetectorState.recentGoalViolations">
+            <tr v-for="(r, ridx) in AnomalyDetectorState.recentGoalViolations" :key='ridx'>
               <td>{{ r.detectionMs | formatLocalTime }} ago</td>
               <td>
                 <!-- Depedning on the version of CC we use, two types of responses are being sent out -->
                 <template v-if='r.hasOwnProperty("violatedGoals")'>
                   <ul class="list-group">
-                    <li class="list-group-item list-group-item-danger" v-for="g in r.violatedGoals">{{ g }}</li>
+                    <li class="list-group-item list-group-item-danger" v-for="(g, gidx) in r.violatedGoals" :key='gidx'>{{ g }}</li>
                   </ul>
                 </template>
                 <template v-else>
                   <h5>Fixable</h5>
                   <ul class="list-group" v-if='r.fixableViolatedGoals.length > 0'>
-                    <li class="list-group-item list-group-item-success" v-for="g in r.fixableViolatedGoals">{{ g }}</li>
+                    <li class="list-group-item list-group-item-success" v-for="(g, gidx) in r.fixableViolatedGoals" :key='gidx'>{{ g }}</li>
                   </ul>
                   <div class="alert alert-info" v-else>None</div>
                   <h5>UnFixable</h5>
                   <ul class="list-group" v-if='r.unfixableViolatedGoals.length > 0'>
-                    <li class="list-group-item list-group-item-danger" v-for="g in r.unfixableViolatedGoals">{{ g }}</li>
+                    <li class="list-group-item list-group-item-danger" v-for="(g, gidx) in r.unfixableViolatedGoals" :key='gidx'>{{ g }}</li>
                   </ul>
                   <div class="alert alert-info" v-else>None</div>
                 </template>
@@ -118,7 +118,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for='r in AnomalyDetectorState.recentMetricAnomalies'>
+            <tr v-for='(r, ridx) in AnomalyDetectorState.recentMetricAnomalies' :key='ridx'>
               <td>{{ r.detectionMs | formatLocalTime }} ago</td>
               <td>{{ r.description }}</td>
             </tr>
@@ -131,16 +131,14 @@
 </template>
 
 <script>
-import BooleanEL from '@/components/BooleanEL'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'AnomalyDetector',
   props: {
-    'group': String,
-    'cluster': String
-  },
-  components: {
-    BooleanEL
+    group: String,
+    cluster: String
   },
   data () {
     return {
@@ -150,6 +148,8 @@ export default {
       errorData: null,
       async: false, // when the server treats this request as async
       asyncData: null, // when the server treats the request as async and sends progress instead of actual response
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       AnomalyDetectorState: {
         selfHealingDisabled: [],
         selfHealingEnabled: [],
@@ -161,6 +161,14 @@ export default {
   },
   created () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -175,50 +183,61 @@ export default {
       return this.$store.state.hideHelperURL
     },
     url () {
-      return this.$helpers.getURL('state', {substates: 'ANOMALY_DETECTOR', verbose: true})
+      return this.$helpers.getURL('state', { substates: 'ANOMALY_DETECTOR', verbose: true })
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getState()
     },
     getState () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getState(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
-          vm.$set(vm, 'AnomalyDetectorState', r.data.AnomalyDetectorState)
-          vm.loading = false
+          const defaults = { selfHealingDisabled: [], selfHealingEnabled: [], recentBrokerFailures: [], recentMetricAnomalies: [], recentGoalViolations: [] }
+          vm.$set(vm, 'AnomalyDetectorState', Object.assign(defaults, result.data.AnomalyDetectorState))
           vm.loaded = true
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
-      })
-    },
-    stopProposalExecution () {
-      let vm = this
-      // cancel the on-going proposal execution
-      vm.$http.post(this.stopProposalExecutionURL, {withCredentials: true}).then((r) => {
-        vm.errStopProsalExecution = false
-        vm.okDataStopProposalExecution = r.data
-      }, (e) => {
-        vm.errStopProsalExecution = true
-        vm.errDataStopProposalExecution = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }

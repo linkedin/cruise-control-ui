@@ -97,12 +97,12 @@
     </div>
     <div v-else-if='async'>
       <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
-        <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
+        <button class="btn btn-sm btn-secondary" @click='getPartitionLoad()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
       </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if="!loaded && loading">
-      Loading ...
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <table class="table table-sm table-bordered" v-else-if='records.length > 0'>
       <thead>
@@ -112,12 +112,12 @@
       </thead>
       <transition-group name="fade" tag="tbody">
         <tr :key='r.topic + "-" + r.partition' v-for="r in records">
-          <td v-for='(hv, hk) in header'>
+          <td v-for='(hv, hk) in header' :key="hk">
             <template v-if='colUnits[hk] === "float"'>
-              {{ r[hv].toFixed(2) }}
+              {{ r[hv] != null ? r[hv].toFixed(2) : '' }}
             </template>
             <template v-else-if='colUnits[hk] === "int"'>
-              {{ parseInt(r[hv], 10) }}
+              {{ r[hv] != null ? parseInt(r[hv], 10) : '' }}
             </template>
             <template v-else>
               {{ r[hv] }}
@@ -132,6 +132,8 @@
 
 <script>
 import xssFilters from 'xss-filters'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'PartitionLoad',
@@ -149,13 +151,15 @@ export default {
       errorData: null,
       async: false,
       asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       // Form Elements
       resource: 'DISK',
       allResources: [
-        {key: 'CPU', label: 'CPU'},
-        {key: 'NW_IN', label: 'Network In'},
-        {key: 'NW_OUT', label: 'Network Out'},
-        {key: 'DISK', label: 'Disk'}
+        { key: 'CPU', label: 'CPU' },
+        { key: 'NW_IN', label: 'Network In' },
+        { key: 'NW_OUT', label: 'Network Out' },
+        { key: 'DISK', label: 'Disk' }
       ],
       numRecords: 100,
       allowCapacityEstimation: true,
@@ -171,7 +175,16 @@ export default {
       records: [],
       header: [],
       colUnits: [],
+      showAsyncRefreshButton: false,
       detectedUserTaskId: false // true in case the response has user-task-id
+    }
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
     }
   },
   watch: {
@@ -189,7 +202,7 @@ export default {
     apiMinorVersion () {
       // NnwOutRate has been changed to NwOutRate and Upstream
       // API does not expose this correctly.
-      if (this.records.length > 0 && this.records[0].hasOwnProperty('networkInbound')) {
+      if (this.records.length > 0 && Object.prototype.hasOwnProperty.call(this.records[0], 'networkInbound')) {
         return 2
       } else {
         return 1
@@ -199,7 +212,7 @@ export default {
       return this.$store.state.hideHelperURL
     },
     url () {
-      let params = {
+      const params = {
         resource: this.resource,
         entries: this.numRecords,
         allow_capacity_estimation: this.allowCapacityEstimation,
@@ -227,51 +240,68 @@ export default {
       this.tos = true
       this.getPartitionLoad()
     },
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
-      this.newurl = newurl
-      this.getPartitionLoad()
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
+      if (this.tos) {
+        this.getPartitionLoad()
+      }
     },
     getPartitionLoad () {
-      let vm = this
+      const vm = this
       vm.error = false
       vm.async = false
       vm.loaded = false
       vm.loading = true
-      let params = {
-        withCredentials: true
-      }
-      // check if there is a running user-task-id for this end point in the $store
-      // let task = this.$store.getters.getTaskId('proposals')
-      let task = this.$store.getters.getTaskId(vm.url)
+      const fetchOptions = {}
+      const task = this.$store.getters.getTaskId(vm.url)
       if (task) {
-        params['headers'] = {
-          'User-Task-ID': task
-        }
+        fetchOptions.headers = { 'User-Task-ID': task }
       }
-      vm.$http.get(vm.url, params).then((r) => {
-        // set this so that we know if the server sends user-task-id in the response
-        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
-        // do check the data response
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url, fetchOptions).then((result) => {
+        vm.detectedUserTaskId = result.headers.has('user-task-id')
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
-          let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
-          vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
+        } else if (result.type === 'async') {
+          vm.loading = false
+          const taskId = result.headers.has('user-task-id') ? result.headers.get('user-task-id') : null
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: taskId })
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
           vm.showAsyncRefreshButton = true
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          // Only auto-retry if we have a task ID to poll; without one, each
+          // retry starts a new expensive computation on CC.
+          if (taskId) {
+            vm.asyncRetryTimer = setTimeout(() => vm.getPartitionLoad(), ASYNC_RETRY_DELAY)
+          }
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.loading = false
           vm.loaded = true
           vm.error = false
           vm.errorData = null
-          vm.records = r.data.records || []
-          // CPU/Disk/NW* are converted to lowercase after refactor in CruiseControl code
+          vm.records = result.data.records || []
           if (vm.apiMinorVersion === 2) {
             vm.header = ['topic', 'partition', 'leader', 'followers', 'cpu', 'disk', 'networkInbound', 'networkOutbound', 'msg_in']
             vm.colUnits = ['str', 'int', 'int', 'list', 'float', 'float', 'float', 'float', 'int']
@@ -279,11 +309,14 @@ export default {
             vm.header = ['topic', 'partition', 'leader', 'followers', 'CPU', 'DISK', 'NW_IN', 'NW_OUT', 'MSG_IN']
             vm.colUnits = ['str', 'int', 'int', 'list', 'float', 'float', 'float', 'float', 'int']
           }
+          // Clear the cached task ID so the next refresh fetches fresh data
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: null })
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.error = true
         vm.loading = false
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }

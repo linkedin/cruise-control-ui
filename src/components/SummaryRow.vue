@@ -3,19 +3,27 @@
     <td>{{ group }}</td>
     <td>{{ cluster }}</td>
     <td colspan=5 v-if='!loaded && loading'>
-      Loading ...
+      <div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading ...
+    </td>
+    <td colspan=5 v-else-if='error'>
+      <span class="text-danger">Error loading data</span>
+    </td>
+    <td colspan=5 v-else-if='!loaded'>
+      <span class="text-muted">Waiting for data...</span>
     </td>
     <template v-else>
       <td>{{ stats_brokers }}</td>
       <td>{{ stats_leaders }}</td>
       <td>{{ stats_replicas }}</td>
-      <td>{{ Number(stats_replicas / stats_leaders).toFixed(2) }}</td>
+      <td>{{ stats_leaders > 0 ? Number(stats_replicas / stats_leaders).toFixed(2) : 'N/A' }}</td>
       <td>{{ stats_outofsync }}</td>
     </template>
   </tr>
 </template>
 
 <script>
+import fetchCC from '@/fetchCC'
+
 export default {
   name: 'SummaryRow',
   props: [
@@ -27,8 +35,7 @@ export default {
   data () {
     return {
       timer: null,
-      destroyed: true,
-      req: null,
+      destroyed: false,
       loaded: false,
       loading: false,
       error: false,
@@ -68,56 +75,63 @@ export default {
   },
   methods: {
     poll () {
-      let vm = this
+      const vm = this
       if (!vm.destroyed) {
         // after vm.timeout seconds fetch the data
         vm.timer = window.setTimeout(function () {
           vm.getKafkaState()
         }, vm.timeout)
       } else {
-        console.log('destroyed. not calling timer again ...')
+        // destroyed, not calling timer again
       }
     },
     getKafkaState () {
       const vm = this
       vm.loading = true
       let url = this.url + (this.url.endsWith('/') ? 'kafka_cluster_state' : '/kafka_cluster_state')
-      vm.req = vm.$http.get(url, {params: {json: true}, withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'json=true'
+      fetchCC(url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+        } else if (result.type === 'error') {
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
           vm.loaded = true
-          vm.KafkaPartitionState.offline = r.data.KafkaPartitionState.offline
-          vm.KafkaPartitionState.urp = r.data.KafkaPartitionState.urp
-          vm.KafkaBrokerState.ReplicaCountByBrokerId = r.data.KafkaBrokerState.ReplicaCountByBrokerId
-          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = r.data.KafkaBrokerState.OutOfSyncCountByBrokerId
-          vm.KafkaBrokerState.LeaderCountByBrokerId = r.data.KafkaBrokerState.LeaderCountByBrokerId
+          const data = result.data
+          vm.KafkaPartitionState.offline = data.KafkaPartitionState.offline
+          vm.KafkaPartitionState.urp = data.KafkaPartitionState.urp
+          vm.KafkaBrokerState.ReplicaCountByBrokerId = data.KafkaBrokerState.ReplicaCountByBrokerId
+          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = data.KafkaBrokerState.OutOfSyncCountByBrokerId
+          vm.KafkaBrokerState.LeaderCountByBrokerId = data.KafkaBrokerState.LeaderCountByBrokerId
           // only >= kafka 2.0 release
           try {
-            vm.KafkaPartitionState['with-offline-replicas'] = r.data.KafkaPartitionState['with-offline-replicas']
-            vm.KafkaPartitionState['under-min-isr'] = r.data.KafkaPartitionState['under-min-isr']
-            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = r.data.KafkaBrokerState.OfflineReplicaCountByBrokerId
-            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = r.data.KafkaBrokerState.OfflineLogDirsByBrokerId
-            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = r.data.KafkaBrokerState.OnlineLogDirsByBrokerId
-            console.log('Found Kafka-2.0 Features.')
+            vm.KafkaPartitionState['with-offline-replicas'] = data.KafkaPartitionState['with-offline-replicas']
+            vm.KafkaPartitionState['under-min-isr'] = data.KafkaPartitionState['under-min-isr']
+            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = data.KafkaBrokerState.OfflineReplicaCountByBrokerId
+            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = data.KafkaBrokerState.OfflineLogDirsByBrokerId
+            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = data.KafkaBrokerState.OnlineLogDirsByBrokerId
           } catch (e) {
-            console.log('No kafka 2.0 features found')
+            // Kafka 2.0 features not available
           }
         }
-        vm.poll() // fetch the data again
-      }, (e) => {
+        vm.poll()
+      }).catch((e) => {
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
-        vm.poll() // fetch the data again
+        vm.errorData = e.message || e
+        vm.poll()
       })
     }
   },

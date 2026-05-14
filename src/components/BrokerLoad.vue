@@ -5,13 +5,17 @@
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>
-    <div v-else-if="loading && !sortedBrokers">
-      Loading ...
+    <div v-else-if="loading && sortedBrokers.length === 0">
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
-    <table class="table table-sm table-bordered" v-else-if='sortedBrokers && sortedBrokers.length > 0'>
+    <div v-else-if='sortedBrokers.length > 0'>
+    <div class="form-inline mb-2">
+      <input type="text" class="form-control form-control-sm" v-model="filterText" placeholder="Filter by Broker ID, Host, or Rack...">
+    </div>
+    <table class="table table-sm table-bordered">
       <thead class="thead-light">
         <tr>
-          <th colspan=3 class='text-center'>Broker</th>
+          <th colspan=4 class='text-center'>Broker</th>
           <th colspan=2 class='text-center'>Topic/Partition</th>
           <th colspan=2 class='text-center'>Disk/Cpu</th>
           <th colspan=6 class='text-center'>Network Rate</th>
@@ -20,6 +24,7 @@
           <th @click='sort("Broker")'>ID</th>
           <th @click='sort("BrokerState")'>State</th>
           <th @click='sort("Host")'>Host</th>
+          <th @click='sort("Rack")'>Rack</th>
           <th @click='sort("Replicas")'>#Replicas</th>
           <th @click='sort("Leaders")'>#Leaders</th>
           <th @click='sort("DiskMB")'>Disk Used</th>
@@ -34,14 +39,15 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="e in sortedBrokers">
+        <tr v-for="e in filteredBrokers" :key="e.Broker">
           <td>{{ e.Broker }}</td>
           <td><broker-state :state='e.BrokerState'></broker-state></td>
           <td>{{ e.Host | formatHost }}</td>
+          <td>{{ e.Rack && e.Rack !== e.Host ? e.Rack : 'N/A' }}</td>
           <td :class='e.Replicas < 1 ? "table-info" : null'>{{ e.Replicas }}</td>
           <td :class='e.Leaders < 1 ? "table-warning" : null'>{{ e.Leaders }}</td>
           <td>{{ e.DiskMB | formatUnits }}</td>
-          <td>{{ e.CpuPct.toFixed(2) }} %</td>
+          <td>{{ e.CpuPct != null ? e.CpuPct.toFixed(2) : 'N/A' }} %</td>
           <td>{{ e.LeaderNwInRate | formatNetworkUnits }}</td>
           <td>{{ e.FollowerNwInRate | formatNetworkUnits }}</td>
           <td v-if='apiMinorVersion === 2'>{{ e.NwOutRate | formatNetworkUnits }}</td>
@@ -53,6 +59,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
     <div v-else>No Brokers Found.</div>
   </div>
 </template>
@@ -74,7 +81,8 @@ export default {
   },
   data () {
     return {
-      sortColumn: 'Replicas'
+      sortColumn: 'Replicas',
+      filterText: ''
     }
   },
   methods: {
@@ -86,10 +94,19 @@ export default {
     sortedBrokers () {
       return sortBy(this.brokers, this.sortColumn)
     },
+    filteredBrokers () {
+      if (!this.filterText) return this.sortedBrokers
+      const q = this.filterText.toLowerCase()
+      return this.sortedBrokers.filter(b => {
+        return String(b.Broker).toLowerCase().includes(q) ||
+          (b.Host && b.Host.toLowerCase().includes(q)) ||
+          (b.Rack && b.Rack.toLowerCase().includes(q))
+      })
+    },
     apiMinorVersion () {
       // NnwOutRate has been changed to NwOutRate and Upstream
       // API does not expose this correctly.
-      if (this.brokers.length > 0 && this.brokers[0].hasOwnProperty('NwOutRate')) {
+      if (this.brokers && this.brokers.length > 0 && Object.prototype.hasOwnProperty.call(this.brokers[0], 'NwOutRate')) {
         return 2
       } else {
         return 1

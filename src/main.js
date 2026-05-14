@@ -19,6 +19,7 @@ Vue.use(Vuex)
 Vue.component('exception', Exception)
 Vue.component('async-task', AsyncTask)
 
+Axios.defaults.withCredentials = true
 Vue.prototype.$http = Axios
 Vue.prototype.$helpers = Api
 Vue.config.productionTip = false
@@ -26,10 +27,10 @@ Vue.config.productionTip = false
 // disk is already in MB
 Vue.filter('formatUnits', function (v) {
   v = v * 1024 * 1024
-  var units = [ 'B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB' ]
-  for (var i = 0; i < units.length; i++) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+  for (let i = 0; i < units.length; i++) {
     if (v <= Math.pow(1024, i + 1)) {
-      var value = v / Math.pow(1024, i)
+      let value = v / Math.pow(1024, i)
       value = value.toFixed(2)
       return value + ' ' + units[i]
     }
@@ -39,10 +40,10 @@ Vue.filter('formatUnits', function (v) {
 // network is in KB
 Vue.filter('formatNetworkUnits', function (v) {
   v = v * 1000
-  var units = [ 'Bps', 'KBps', 'MBps', 'GBps', 'TBps', 'PBps', 'EBps', 'ZBps', 'YBps' ]
-  for (var i = 0; i < units.length; i++) {
+  const units = ['Bps', 'KBps', 'MBps', 'GBps', 'TBps', 'PBps', 'EBps', 'ZBps', 'YBps']
+  for (let i = 0; i < units.length; i++) {
     if (v <= Math.pow(1024, i + 1)) {
-      var value = v / Math.pow(1024, i)
+      let value = v / Math.pow(1024, i)
       value = value.toFixed(0)
       return value + ' ' + units[i]
     }
@@ -61,6 +62,11 @@ Vue.filter('formatNumber', function (v) {
   return Number(v).toLocaleString()
 })
 
+Vue.filter('formatDecimal', function (v) {
+  const n = Number(v)
+  return isNaN(n) ? '—' : n.toFixed(2)
+})
+
 Vue.filter('camelCase', function (v) {
   return v.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
 })
@@ -70,7 +76,7 @@ Vue.filter('splitCamelCase', function (v) {
 })
 
 Vue.filter('formatLocalTime', function (v) {
-  let d = new Date() / 1000
+  const d = new Date() / 1000
   return Number((d - v / 1000)).toFixed(0) + ' secs'
 })
 

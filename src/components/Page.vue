@@ -1,6 +1,6 @@
 <!-- Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. -->
 <template>
-  <div v-if="group == 'a' || cluster == 'b'">
+  <div v-if="!group || !cluster || (group === 'a' && cluster === 'b')">
     <div class="alert alert-info">
       <h3>Hi There !</h3>
       <p>To get started, please select one cluster from the top navigation.</p>
@@ -74,18 +74,16 @@ export default {
     group: String,
     cluster: String
   },
-  data () {
-    return {
-      modules: this.$store.state.modules
-    }
-  },
   computed: {
+    modules () {
+      return this.$store.state.modules
+    },
     configloaded () {
       return Object.keys(this.$store.state.config).length > 0
     }
   },
   components: {
-    'offline': Offline
+    offline: Offline
   }
 }
 </script>

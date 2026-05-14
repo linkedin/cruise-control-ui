@@ -13,23 +13,43 @@
 </template>
 
 <script>
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'AdminSampling',
   props: {
-    'group': String,
-    'cluster': String
+    group: String,
+    cluster: String
   },
   data () {
     return {
+      loading: false,
+      loaded: false,
       error: false,
       errorData: null,
+      async: false,
+      asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
+      successTimer: null,
       success: null,
       state: ''
     }
   },
   created () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
+    if (this.successTimer) {
+      clearTimeout(this.successTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -41,7 +61,7 @@ export default {
   },
   computed: {
     monitor_url () {
-      return this.$helpers.getURL('state', {substates: 'monitor'})
+      return this.$helpers.getURL('state', { substates: 'monitor' })
     },
     url () {
       if (this.state === 'PAUSED') {
@@ -59,44 +79,66 @@ export default {
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.fetchMonitorState()
     },
     fetchMonitorState () {
       const vm = this
       vm.loading = true
-      this.$http.get(vm.monitor_url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.monitor_url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.fetchMonitorState(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
-          vm.state = r.data.MonitorState
-          vm.loading = false
+          vm.state = result.data.MonitorState.state
           vm.loaded = true
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     },
     changeState () {
-      let vm = this
-      this.$http.post(vm.url, {withCredentials: true}).then((r) => {
+      const vm = this
+      this.$http.post(vm.url, null, { withCredentials: true }).then((r) => {
         vm.success = true
-        window.setTimeout(function () {
+        vm.successTimer = window.setTimeout(function () {
+          vm.successTimer = null
           vm.success = null
-          vm.state = null
+          vm.fetchMonitorState()
         }, 3000)
       }, (e) => {
         vm.error = true

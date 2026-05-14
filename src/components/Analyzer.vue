@@ -7,6 +7,9 @@
     <div v-if='!loading'>
       <div class="alert alert-primary text-right">
         <button class="btn btn-primary" @click='getState()'>Refresh Analyzer State</button>
+        <button :class="['btn', autoRefresh ? 'btn-success' : 'btn-outline-secondary']" @click='toggleAutoRefresh()'>
+          Auto-Refresh {{ autoRefresh ? 'ON (30s)' : 'OFF' }}
+        </button>
       </div>
     </div>
     <div v-if='error'>
@@ -16,10 +19,10 @@
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if='!loaded && loading'>
-      <p>Loading ...</p>
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else>
-      <div class class="card-deck mb-3">
+      <div class="card-deck mb-3">
         <div class='card text-center'>
           <div class='card-header'>Analyzer</div>
           <div class='card-body'>
@@ -42,7 +45,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in AnalyzerState.goalReadiness">
+              <tr v-for="(r, idx) in AnalyzerState.goalReadiness" :key="idx">
                 <td>{{ r.name }}</td>
                 <td><boolean-el :label='r.status' /></td>
                 <td><boolean-el :label='r.modelCompleteRequirement.includeAllTopics' /></td>
@@ -59,12 +62,14 @@
 
 <script>
 import BooleanEL from '@/components/BooleanEL'
+import { AUTO_REFRESH_INTERVAL, ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'Analyzer',
   props: {
-    'group': String,
-    'cluster': String
+    group: String,
+    cluster: String
   },
   components: {
     'boolean-el': BooleanEL
@@ -77,6 +82,10 @@ export default {
       errorData: null,
       async: false, // when the server treats this request as async
       asyncData: null, // when the server treats the request as async and sends progress instead of actual response
+      autoRefresh: true,
+      autoRefreshInterval: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       AnalyzerState: {
         isProposalReady: false,
         readyGoals: [],
@@ -86,6 +95,18 @@ export default {
   },
   created () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval)
+      this.autoRefreshInterval = null
+    }
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -100,40 +121,92 @@ export default {
       return this.$store.state.hideHelperURL
     },
     url () {
-      return this.$helpers.getURL('state', {substates: 'ANALYZER', verbose: true})
+      return this.$helpers.getURL('state', { substates: 'ANALYZER', verbose: true })
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
+      if (this.autoRefreshInterval) {
+        clearInterval(this.autoRefreshInterval)
+        this.autoRefreshInterval = null
+      }
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getState()
+      if (this.autoRefresh) {
+        this.autoRefreshInterval = setInterval(() => {
+          if (!this.loading) {
+            this.getState()
+          }
+        }, AUTO_REFRESH_INTERVAL)
+      }
+    },
+    toggleAutoRefresh () {
+      if (this.autoRefresh) {
+        clearInterval(this.autoRefreshInterval)
+        this.autoRefreshInterval = null
+        this.autoRefresh = false
+      } else {
+        this.autoRefresh = true
+        this.autoRefreshInterval = setInterval(() => {
+          if (!this.loading) {
+            this.getState()
+          }
+        }, AUTO_REFRESH_INTERVAL)
+      }
     },
     getState () {
       const vm = this
       vm.loading = true
-      vm.loaded = false
-      this.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.autoRefreshInterval) { clearInterval(vm.autoRefreshInterval); vm.autoRefreshInterval = null }
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getState(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
-          vm.$set(vm, 'AnalyzerState', r.data.AnalyzerState)
-          vm.loading = false
+          const defaults = { isProposalReady: false, readyGoals: [], goalReadiness: [] }
+          vm.$set(vm, 'AnalyzerState', Object.assign(defaults, result.data.AnalyzerState))
           vm.loaded = true
+          if (vm.autoRefresh && !vm.autoRefreshInterval) {
+            vm.autoRefreshInterval = setInterval(() => {
+              if (!vm.loading) { vm.getState() }
+            }, AUTO_REFRESH_INTERVAL)
+          }
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }

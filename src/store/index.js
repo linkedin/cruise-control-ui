@@ -2,6 +2,7 @@
 
 import Vue from 'vue'
 import Vuex from 'vuex'
+import { AUTO_REFRESH_INTERVAL } from '@/constants'
 
 Vue.use(Vuex)
 
@@ -15,7 +16,7 @@ export default new Vuex.Store({
     url: null, // origin of the current CC we are dealing with
     online: true,
     autoReloadEnabled: false, // disabled by default
-    autoReloadInterval: 30000, // 30 seconds
+    autoReloadInterval: AUTO_REFRESH_INTERVAL,
     // these control the enablement of a module in cruise control
     modules: {
       chart_page: true,
@@ -47,7 +48,7 @@ export default new Vuex.Store({
     },
     getnewurl: function (state, getters) {
       return function (group, label) {
-        return state.config[group][label]
+        return state.config[group] && state.config[group][label]
       }
     },
     getTaskId: function (state, getters) {

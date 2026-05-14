@@ -15,7 +15,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for='part in pagepartitions'>
+        <tr v-for='(part, idx) in pagepartitions' :key='idx'>
           <td>{{ part.topic }}</td>
           <td>{{ part.partition }}</td>
           <td>{{ part.replicas }}</td>
@@ -34,7 +34,7 @@
             <input v-model='perpage' type='number'>
             <label> Page #</label>
             <select v-model='pageNumber'>
-              <option v-for='p in pages'>{{ p }}</option>
+              <option v-for='p in pages' :key='p' :value='p'>{{ p }}</option>
             </select>
           </td>
         </tr>
@@ -55,29 +55,21 @@ export default {
     return {
       search: '', // inline filter on the topic
       pageNumber: 1, // default page number data to be shown when initialized for first time
-      perpage: 10, // total number of partitions to show in one page
-      start: 0, // start offset in partitions array
-      end: 10 // end offset in partitions array
+      perpage: 10 // total number of partitions to show in one page
     }
   },
-  // these variables are computed whenever there is any dependency change in the members
   computed: {
-    // Array of page numbers to show based on active services (including filtered) data
     pages () {
-      let list = []
+      const list = []
       for (let i = 0; i < this.partitions.length / this.perpage; i++) {
         list.push(i + 1)
       }
       return list
     },
-    // Returns the list of partitions that can be rendered in the current page thats selected by user.
     pagepartitions () {
-      this.start = (this.pageNumber - 1) * this.perpage
-      this.end = Math.min(
-        this.pageNumber * this.perpage,
-        this.partitions.length,
-      )
-      return this.partitions.slice(this.start, this.end)
+      const start = (this.pageNumber - 1) * this.perpage
+      const end = Math.min(this.pageNumber * this.perpage, this.partitions.length)
+      return this.partitions.slice(start, end)
     }
   }
 }

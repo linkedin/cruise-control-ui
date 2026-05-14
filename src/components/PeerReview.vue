@@ -15,7 +15,7 @@
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if='!loaded && loading'>
-      <p>Loading ...</p>
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else>
       <table class="table table-sm table-bordered">
@@ -42,10 +42,10 @@
             <td><span :class='statusLabel(r.Status)'>{{ r.Status }}</span></td>
             <td>{{ r.Reason }}</td>
             <td>
-              <!-- {{ reconstructURL(r.EndpointWithParams, r.Id) }} --> 
+              <!-- {{ reconstructURL(r.EndpointWithParams, r.Id) }} -->
               {{ r.EndpointWithParams }}</td>
             <td>
-              <template v-if='r.Status.match(/PENDING_REVIEW/)'>
+              <template v-if='r.Status && r.Status.match(/PENDING_REVIEW/)'>
                 <input type='checkbox' v-model='selectedIds' :value='r.Id'>
               </template>
             </td>
@@ -79,6 +79,8 @@
 
 <script>
 import parse from 'url-parse'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'PeerReview',
@@ -94,8 +96,10 @@ export default {
       errorData: null,
       async: false,
       asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       selectedIds: [],
-      actionName: null,
+      actionName: '',
       actionReason: '',
       reviews: [],
       posted: false,
@@ -103,53 +107,93 @@ export default {
     }
   },
   created () {
-    this.getReviews()
+    this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
+  },
+  watch: {
+    group: function (ogroup, ngroup) {
+      this.argsChanged()
+    },
+    cluster: function (ocluster, ncluster) {
+      this.argsChanged()
+    }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
-      this.newurl = newurl
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getReviews()
     },
     getReviews () {
-      let vm = this
+      const vm = this
       vm.loading = true
       vm.selectedIds = []
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getReviews(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.loading = false
           vm.error = false
           vm.errorData = null
-          vm.reviews = r.data.RequestInfo || []
+          vm.reviews = result.data.RequestInfo || []
+          vm.loaded = true
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     },
     doAction () {
-      let vm = this
-      vm.$http.post(vm.action_url, {withCredentials: true}).then((r) => {
+      if (!this.actionName) return
+      const vm = this
+      vm.$http.post(vm.action_url, null, { withCredentials: true }).then((r) => {
         vm.getReviews()
-      }, (e) => {
-        console.log('Failed to submit.')
+      }).catch((e) => {
+        vm.error = true
+        vm.errorData = e && e.response ? e.response.data : (e.message || e)
       })
     },
     submitApprovedRequest (r) {
-      let action = r.EndpointWithParams
-      let absUrl = this.reconstructURL(action, r.Id)
-      let vm = this
-      vm.$http.post(absUrl, {withCredentials: true}).then((r) => {
+      const action = r.EndpointWithParams
+      const absUrl = this.reconstructURL(action, r.Id)
+      const vm = this
+      vm.$http.post(absUrl, null, { withCredentials: true }).then((r) => {
         vm.posted = true
         vm.postResponse = r.data || 'Cruise Control Did not send a valid response. Check the server logs.'
         vm.getReviews()
@@ -171,10 +215,11 @@ export default {
       }
     },
     reconstructURL (u, id) {
-      var url = this.$store.state.url
-      let parsed = parse(url + u)
-      let params = {review_id: id}
-      parsed.set('query', params)
+      const url = this.$store.state.url
+      const parsed = parse(url + u, true)
+      const existing = parsed.query || {}
+      existing.review_id = id
+      parsed.set('query', existing)
       return parsed.toString()
     },
     clearPostResponse () {
@@ -189,7 +234,7 @@ export default {
       //    &approve=[id1,id2,...]
       //    &discard=[id1,id2,...]
       //    &reason=[reason-for-review]
-      let params = {
+      const params = {
         json: true,
         reason: this.actionReason
       }
@@ -197,7 +242,7 @@ export default {
       return this.$helpers.getURL('review', params)
     },
     url () {
-      let params = {'json': 'true'}
+      const params = { json: 'true' }
       // Previously this end point is /review with POST method, in later versions its changed to /review_board with GET method
       // See https://github.com/linkedin/cruise-control/blob/3a97169c7a49859cf60675ef37a23e35ed35f30e/docs/wiki/User%20Guide/2-step-verification-for-POST-requests.md
       return this.$helpers.getURL('review_board', params)

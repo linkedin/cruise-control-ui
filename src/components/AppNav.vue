@@ -45,25 +45,25 @@ export default {
         url: null
       },
       csvTimer: null,
-      cclogo: cclogo
+      cclogo
     }
   },
   methods: {
     configFetch () {
-      let vm = this
+      const vm = this
       let notselected = true
-      let url = vm.$store.state.configurl + '?_t=' + (new Date() / 1)
+      const url = vm.$store.state.configurl + '?_t=' + (new Date() / 1)
       // download the cluster information csv file
-      vm.$http.get(url, {withCredentials: true}).then((r) => {
-        let lines = r.data.split(/\n/)
-        let groups = {}
-        let config = {}
+      vm.$http.get(url, { withCredentials: true }).then((r) => {
+        const lines = r.data.split(/\n/)
+        const groups = {}
+        const config = {}
         for (let i = 0; i < lines.length; i++) {
-          let csv = lines[i].split(/,/)
+          const csv = lines[i].split(/,/)
           if (csv.length === 3) {
-            let group = xssFilters.inHTMLData(csv[0])
-            let label = xssFilters.inHTMLData(csv[1])
-            let url = xssFilters.uriInHTMLData(csv[2])
+            const group = xssFilters.inHTMLData(csv[0])
+            const label = xssFilters.inHTMLData(csv[1])
+            const url = xssFilters.uriInHTMLData(csv[2])
             if (!groups[group]) {
               groups[group] = []
             }
@@ -73,12 +73,13 @@ export default {
             if (!config[group][label]) {
               config[group][label] = csv[2]
             }
-            groups[group].push({label: label, url: url})
+            groups[group].push({ label, url })
             // set the initial selected things
             if (notselected) {
               vm.$set(vm.active, 'group', group)
               vm.$set(vm.active, 'cluster', label)
               vm.$set(vm.active, 'url', url)
+              notselected = false
             }
           }
         }
@@ -94,15 +95,13 @@ export default {
       }, (e) => {
         vm.$store.commit('configError', true)
         vm.$store.commit('configErrorMessage', 'Error encountered while fetching :' + vm.$store.state.configurl)
-      }).then(() => {
-        console.log('completed')
       })
     },
     refresh () {
       this.configFetch()
     },
     reloadForever () {
-      let vm = this
+      const vm = this
       vm.csvTimer = window.setInterval(function () {
         // console.log('calling ...', vm.$store.state.configFileReloadInterval)
         if (vm.$store.state.enableConfigFileReload) {
@@ -113,11 +112,14 @@ export default {
   },
   created () {
     this.configFetch()
+    if (this.$store.state.enableConfigFileReload) {
+      this.reloadForever()
+    }
   },
   beforeDestroy () {
-    try {
+    if (this.csvTimer) {
       window.clearInterval(this.csvTimer)
-    } catch (e) {}
+    }
   }
 }
 </script>

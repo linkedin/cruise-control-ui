@@ -10,14 +10,14 @@
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>
-    <div v-if='async'>
+    <div v-else-if='async'>
       <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
         <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
       </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
-    <div v-if='loading'>
-      Loading {{ loadingSeconds }} ...
+    <div v-else-if='!loaded && loading'>
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else-if='loaded'>
       <div class="alert alert-info">
@@ -46,44 +46,53 @@
         </tbody>
       </table>
 
-      <h4>Optimized Load Difference - Per Broker</h4>
-      <table class="table table-sm table-bordered">
+      <h4 class="pointer" @click="showBrokerLoad = !showBrokerLoad">
+        Optimized Load Difference - Per Broker
+        <small class="text-muted">{{ showBrokerLoad ? '(click to hide)' : '(click to show)' }}</small>
+      </h4>
+      <table v-if="showBrokerLoad" class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
             <th>Broker ID</th>
-            <th v-for="h in brokerLoad.heading">{{ h }}</th>
+            <th v-for="h in brokerLoad.heading" :key="'bh-'+h">{{ h }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(brokerdata, brokerid) in brokerLoad.records">
+          <tr v-for="(brokerdata, brokerid) in brokerLoad.records" :key="brokerid">
             <th>{{ brokerid }}</th>
-            <td v-for="h in brokerLoad.heading">
+            <td v-for="h in brokerLoad.heading" :key="'bd-'+h">
               <diff-cell :head='h' :cell='brokerdata[h]' :showpct='showpct' />
             </td>
           </tr>
         </tbody>
       </table>
 
-      <h4>Optimized Load Difference - Per Host</h4>
-      <table class="table table-sm table-bordered">
+      <h4 class="pointer" @click="showHostLoad = !showHostLoad">
+        Optimized Load Difference - Per Host
+        <small class="text-muted">{{ showHostLoad ? '(click to hide)' : '(click to show)' }}</small>
+      </h4>
+      <table v-if="showHostLoad" class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
             <!-- <th>Host</th> -->
-            <th v-for="h in hostLoad.heading">{{ h }}</th>
+            <th v-for="h in hostLoad.heading" :key="'hh-'+h">{{ h }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(hostdata, host) in hostLoad.records">
+          <tr v-for="(hostdata, host) in hostLoad.records" :key="host">
             <!-- <th>{{ host }}</th> -->
-            <td v-for="h in hostLoad.heading">
+            <td v-for="h in hostLoad.heading" :key="'hd-'+h">
               <diff-cell :head='h' :cell='hostdata[h]' :showpct='showpct' />
             </td>
           </tr>
         </tbody>
       </table>
 
-      <h4>Goals</h4>
-      <table class="table table-sm table-bordered">
+      <h4 class="pointer" @click="showGoals = !showGoals">
+        Goals
+        <small class="text-muted">{{ showGoals ? '(click to hide)' : '(click to show)' }}</small>
+      </h4>
+      <table v-if="showGoals" class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
             <th>Goal &amp; Goal Violation Details</th>
@@ -112,12 +121,14 @@
 <script>
 import DiffCell from '@/components/DiffCell'
 import Goal from '@/components/Goal'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'Proposals',
   props: {
-    'group': String,
-    'cluster': String
+    group: String,
+    cluster: String
   },
   components: {
     DiffCell,
@@ -126,12 +137,13 @@ export default {
   data () {
     return {
       loading: false,
-      loadingSecondsNow: 0,
       loaded: false,
       error: false,
       errorData: null,
       async: false,
       asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       // top level medatadata
       numReplicaMovements: null,
       recentWindows: null,
@@ -141,15 +153,26 @@ export default {
       // optimized data
       loadBefore: {},
       loadAfter: {},
-      goals: {},
+      goals: [],
       // show percentage diff
       showpct: false,
+      showBrokerLoad: true,
+      showHostLoad: true,
+      showGoals: true,
       showAsyncRefreshButton: false,
       detectedUserTaskId: false // true in case the response has user-task-id
     }
   },
   created () {
-    this.getProposals()
+    this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -166,36 +189,20 @@ export default {
     hideHelperURL () {
       return this.$store.state.hideHelperURL
     },
-    loadingSeconds () {
-      if (this.loading) {
-        this.loadingSecondsNow++
-      } else {
-        this.loadingSecondsNow = 0
-      }
-    },
-    violatedGoals () {
-      let newgoals = []
-      this.goals.forEach((g) => {
-        if (g.goalViolated.match(/VIOLATED/i)) {
-          newgoals.push(g)
-        }
-      })
-      return newgoals
-    },
     url () {
       // loadBeforeOptimization is removed and is available only when
       // we pass verbose=true flag
-      return this.$helpers.getURL('proposals', {verbose: true})
+      return this.$helpers.getURL('proposals', { verbose: true })
     },
     hostLoad () {
-      let hostMap = [
+      const hostMap = [
         {}, // before load
         {} // after load
       ]
-      let unified = {}
-      if (!this.loadBefore.brokers || !this.loadAfter.brokers) return {'heading': [], 'records': []}
+      const unified = {}
+      if (!this.loadBefore.brokers || !this.loadAfter.brokers || !this.loadBefore.hosts || !this.loadAfter.hosts) return { heading: [], records: [] }
       // re-key them based on the broker-id
-      let hostnames = []
+      const hostnames = []
       this.loadBefore.hosts.forEach((rec) => {
         hostnames.push(rec.Host)
         hostMap[0][rec.Host] = rec
@@ -203,7 +210,7 @@ export default {
       this.loadAfter.hosts.forEach((rec) => {
         hostMap[1][rec.Host] = rec
       })
-      let numKeys = [
+      const numKeys = [
         'FollowerNwInRate',
         'Leaders',
         'DiskMB',
@@ -213,44 +220,44 @@ export default {
         'Replicas',
         'LeaderNwInRate'
       ]
-      let strKeys = [
+      const strKeys = [
         'Host'
       ]
-      let allKeys = strKeys
-      allKeys.push(numKeys)
-      allKeys = allKeys.reduce((acc, val) => acc.concat(val), [])
+      const allKeys = [...strKeys, ...numKeys]
       hostnames.forEach((host) => {
-        let diff = {}
+        const before = hostMap[0][host] || {}
+        const after = hostMap[1][host] || {}
+        const diff = {}
         numKeys.forEach((key) => {
           diff[key] = {
-            before: hostMap[0][host][key],
-            after: hostMap[1][host][key],
-            diff: hostMap[0][host][key] - hostMap[1][host][key]
+            before: before[key],
+            after: after[key],
+            diff: (before[key] || 0) - (after[key] || 0)
           }
         })
         strKeys.forEach((key) => {
           diff[key] = {
-            before: hostMap[0][host][key],
-            after: hostMap[1][host][key],
+            before: before[key],
+            after: after[key],
             diff: null
           }
         })
         unified[host] = diff
       })
       return {
-        'heading': allKeys,
-        'records': unified
+        heading: allKeys,
+        records: unified
       }
     },
     brokerLoad () {
-      let brokerMap = [
+      const brokerMap = [
         {}, // before load
         {} // after load
       ]
-      let unified = {}
-      if (!this.loadBefore.brokers || !this.loadAfter.brokers) return {'heading': [], 'records': []}
+      const unified = {}
+      if (!this.loadBefore.brokers || !this.loadAfter.brokers) return { heading: [], records: [] }
       // re-key them based on the broker-id
-      let brokerids = []
+      const brokerids = []
       this.loadBefore.brokers.forEach((rec) => {
         brokerids.push(rec.Broker)
         brokerMap[0][rec.Broker] = rec
@@ -258,7 +265,7 @@ export default {
       this.loadAfter.brokers.forEach((rec) => {
         brokerMap[1][rec.Broker] = rec
       })
-      let numKeys = [
+      const numKeys = [
         'FollowerNwInRate',
         'Leaders',
         'DiskMB',
@@ -268,108 +275,126 @@ export default {
         'Replicas',
         'LeaderNwInRate'
       ]
-      let strKeys = [
+      const strKeys = [
         'BrokerState',
         'Host'
       ]
-      let allKeys = strKeys
-      allKeys.push(numKeys)
-      allKeys = allKeys.reduce((acc, val) => acc.concat(val), [])
+      const allKeys = [...strKeys, ...numKeys]
       brokerids.forEach((broker) => {
-        let diff = {}
+        const before = brokerMap[0][broker] || {}
+        const after = brokerMap[1][broker] || {}
+        const diff = {}
         numKeys.forEach((key) => {
           diff[key] = {
-            before: brokerMap[0][broker][key],
-            after: brokerMap[1][broker][key],
-            diff: brokerMap[0][broker][key] - brokerMap[1][broker][key]
+            before: before[key],
+            after: after[key],
+            diff: (before[key] || 0) - (after[key] || 0)
           }
         })
         strKeys.forEach((key) => {
           diff[key] = {
-            before: brokerMap[0][broker][key],
-            after: brokerMap[1][broker][key],
+            before: before[key],
+            after: after[key],
             diff: null
           }
         })
         unified[broker] = diff
       })
       return {
-        'heading': allKeys,
-        'records': unified
+        heading: allKeys,
+        records: unified
       }
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getProposals()
     },
     getProposals () {
-      let vm = this
+      const vm = this
       vm.error = false
       vm.async = false
       vm.loading = true
-      let params = {
-        withCredentials: true
+      const fetchOptions = {}
+      const task = this.taskId
+      if (task) {
+        fetchOptions.headers = { 'User-Task-ID': task }
       }
-      // check if there is a running user-task-id for this end point in the $store
-      // let task = this.$store.getters.getTaskId('proposals')
-      let task = this.task
-      if (this.task) {
-        params['headers'] = {
-          'User-Task-ID': task
-        }
-      }
-      vm.$http.get(this.url, params).then((r) => {
-        vm.loading = false
-        // set this so that we know if the server sends user-task-id in the response
-        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
-        /*
-        vm.$store.commit('setTaskId', {url: vm.url, taskid: Math.random() * 10000})
-        console.log(['gettaskId', vm.$store.getters.getTaskId()])
-        */
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url, fetchOptions).then((result) => {
+        vm.detectedUserTaskId = result.headers.has('user-task-id')
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
-          // save the task-id if its present in the response header
-          let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
-          vm.$store.commit('setTaskId', {url: vm.url, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
-          // set the internal bits
+        } else if (result.type === 'async') {
+          vm.loading = false
+          const taskId = result.headers.has('user-task-id') ? result.headers.get('user-task-id') : null
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: taskId })
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
           vm.showAsyncRefreshButton = true
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          // Only auto-retry if we have a task ID to poll; without one, each
+          // retry starts a new expensive proposal computation on CC.
+          if (taskId) {
+            vm.asyncRetryTimer = setTimeout(() => vm.getProposals(), ASYNC_RETRY_DELAY)
+          }
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.loading = false
           vm.error = false
-          // top level metadata in the response
-          vm.numReplicaMovements = r.data.summary.numReplicaMovements
-          vm.recentWindows = r.data.summary.recentWindows
-          vm.dataToMoveMB = r.data.summary.dataToMoveMB
-          vm.monitoredPartitionsPercentage = r.data.summary.monitoredPartitionsPercentage
-          vm.numLeaderMovements = r.data.summary.numLeaderMovements
-          // nested maps
-          vm.$set(vm, 'loadBefore', r.data.loadBeforeOptimization)
-          vm.$set(vm, 'loadAfter', r.data.loadAfterOptimization)
-          // key has been renamed upstream
-          if (r.data.hasOwnProperty('goalSummary')) {
-            vm.$set(vm, 'goals', r.data.goalSummary)
+          const data = result.data
+          // Newer CC versions nest under data.summary; older versions put fields at top level
+          const summary = data.summary || data
+          vm.numReplicaMovements = summary.numReplicaMovements
+          vm.recentWindows = summary.recentWindows
+          vm.dataToMoveMB = summary.dataToMoveMB != null ? summary.dataToMoveMB : summary.intraBrokerDataToMoveMB
+          vm.monitoredPartitionsPercentage = summary.monitoredPartitionsPercentage
+          vm.numLeaderMovements = summary.numLeaderMovements
+          vm.$set(vm, 'loadBefore', data.loadBeforeOptimization || {})
+          vm.$set(vm, 'loadAfter', data.loadAfterOptimization || {})
+          if (Object.prototype.hasOwnProperty.call(data, 'goalSummary')) {
+            vm.$set(vm, 'goals', data.goalSummary || [])
           } else {
-            vm.$set(vm, 'goals', r.data.goals)
+            vm.$set(vm, 'goals', data.goals || [])
           }
           vm.errorData = null
           vm.loaded = true
+          // Clear the cached task ID so the next refresh fetches fresh data
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: null })
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.error = true
         vm.loading = false
         vm.goals = []
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }
 }
 </script>
+
+<style scoped>
+.pointer { cursor: pointer; }
+</style>

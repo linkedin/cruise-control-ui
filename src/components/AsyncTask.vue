@@ -17,7 +17,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="step in steps">
+            <tr v-for="(step, idx) in steps" :key="idx">
               <td>{{ step.label }}</td>
               <td>{{ step.step }}</td>
               <td>{{ step.description }}</td>
@@ -59,70 +59,48 @@ export default {
       this.$emit('CheckAsyncResponse')
     }
   },
-  data () {
-    return {
-      totalCompletion: 0,
-      totalTime: 0
-    }
-  },
   computed: {
     isParsed () {
-      return this.asyncData.hasOwnProperty('progress')
+      return Object.prototype.hasOwnProperty.call(this.asyncData, 'progress')
     },
-    /*
     steps () {
       if (!this.isParsed) {
         return []
-      } else {
-        let steps = this.asyncData.progress
-        let totalCompletion = 0
-        let totalTime = 0.0
-        steps.forEach((step) => {
-          totalCompletion += step.completionPercentage
-          totalTime += step['time-in-ms']
-        })
-        this.totalCompletion = totalCompletion / steps.length
-        this.totalTime = totalTime
-        return steps
       }
-    },
-    */
-    steps () {
-      if (!this.isParsed) {
-        return []
-      } else {
-        let steps = []
-        let totalCompletion = 0
-        let totalTime = 0.0
-        this.asyncData.progress.forEach((op) => {
-          if (op.hasOwnProperty('operationProgress')) {
-            op.operationProgress.forEach((step) => {
-              steps.push({
-                label: op.operation,
-                step: step.step,
-                completionPercentage: step.completionPercentage,
-                description: step.description,
-                'time-in-ms': step['time-in-ms']
-              })
-              totalCompletion += step.completionPercentage
-              totalTime += step['time-in-ms']
-            })
-          } else {
+      const steps = []
+      this.asyncData.progress.forEach((op) => {
+        if (Object.prototype.hasOwnProperty.call(op, 'operationProgress')) {
+          op.operationProgress.forEach((step) => {
             steps.push({
-              label: 'Async Task',
-              step: op.step,
-              completionPercentage: op.completionPercentage,
-              description: op.description,
-              'time-in-ms': op['time-in-ms']
+              label: op.operation,
+              step: step.step,
+              completionPercentage: step.completionPercentage,
+              description: step.description,
+              'time-in-ms': step['time-in-ms']
             })
-            totalCompletion += op.completionPercentage
-            totalTime += op['time-in-ms']
-          }
-        })
-        this.totalCompletion = totalCompletion / steps.length
-        this.totalTime = totalTime
-        return steps
-      }
+          })
+        } else {
+          steps.push({
+            label: 'Async Task',
+            step: op.step,
+            completionPercentage: op.completionPercentage,
+            description: op.description,
+            'time-in-ms': op['time-in-ms']
+          })
+        }
+      })
+      return steps
+    },
+    totalCompletion () {
+      if (this.steps.length === 0) return 0
+      let total = 0
+      this.steps.forEach((s) => { total += s.completionPercentage })
+      return total / this.steps.length
+    },
+    totalTime () {
+      let total = 0
+      this.steps.forEach((s) => { total += s['time-in-ms'] })
+      return total
     }
   }
 }

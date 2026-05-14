@@ -16,7 +16,7 @@
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if='!loaded && loading'>
-      <p>Loading ...</p>
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else>
       <!-- statistics -->
@@ -42,13 +42,13 @@
         <div class="card text-center">
           <div class="card-header">Avg RF.</div>
           <div class="card-body">
-            <h1 :class="['card-text', stats_replicas / stats_leaders >= 3 ? 'text-success' : 'text-info']">{{ Number(stats_replicas / stats_leaders).toFixed(2) }}</h1>
+            <h1 :class="['card-text', stats_leaders > 0 && stats_replicas / stats_leaders >= 3 ? 'text-success' : 'text-info']">{{ stats_leaders > 0 ? Number(stats_replicas / stats_leaders).toFixed(2) : 'N/A' }}</h1>
           </div>
         </div>
         <div class="card text-center">
           <div class="card-header">Out Of Sync Replicas</div>
           <div class="card-body">
-            <h1 :class="['card-text', !stats_outofsync > 0 ? 'text-success' : 'text-danger']">{{ stats_outofsync }}</h1>
+            <h1 :class="['card-text', stats_outofsync === 0 ? 'text-success' : 'text-danger']">{{ stats_outofsync }}</h1>
           </div>
         </div>
       </div>
@@ -67,6 +67,8 @@
 <script>
 import KafkaBrokerState from '@/components/KafkaBrokerState'
 import KafkaPartitionState from '@/components/KafkaPartitionState'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 export default {
   name: 'KafkaClusterState',
@@ -86,6 +88,8 @@ export default {
       errorData: null,
       async: false,
       asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       stats: {
         brokers: 0,
         replicas: 0,
@@ -110,6 +114,14 @@ export default {
   },
   beforeMount () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -149,51 +161,70 @@ export default {
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
-      // console.log(newurl)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
-      this.newurl = newurl
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getKafkaState()
     },
     getKafkaState () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getKafkaState(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
           vm.loaded = true
-          vm.KafkaPartitionState.offline = r.data.KafkaPartitionState.offline
-          vm.KafkaPartitionState.urp = r.data.KafkaPartitionState.urp
-          vm.KafkaBrokerState.ReplicaCountByBrokerId = r.data.KafkaBrokerState.ReplicaCountByBrokerId
-          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = r.data.KafkaBrokerState.OutOfSyncCountByBrokerId
-          vm.KafkaBrokerState.LeaderCountByBrokerId = r.data.KafkaBrokerState.LeaderCountByBrokerId
-          // only >= kafka 2.0 release
+          const data = result.data
+          vm.KafkaPartitionState.offline = data.KafkaPartitionState.offline
+          vm.KafkaPartitionState.urp = data.KafkaPartitionState.urp
+          vm.KafkaBrokerState.ReplicaCountByBrokerId = data.KafkaBrokerState.ReplicaCountByBrokerId
+          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = data.KafkaBrokerState.OutOfSyncCountByBrokerId
+          vm.KafkaBrokerState.LeaderCountByBrokerId = data.KafkaBrokerState.LeaderCountByBrokerId
           try {
-            vm.KafkaPartitionState['with-offline-replicas'] = r.data.KafkaPartitionState['with-offline-replicas']
-            vm.KafkaPartitionState['under-min-isr'] = r.data.KafkaPartitionState['under-min-isr']
-            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = r.data.KafkaBrokerState.OfflineReplicaCountByBrokerId
-            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = r.data.KafkaBrokerState.OfflineLogDirsByBrokerId
-            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = r.data.KafkaBrokerState.OnlineLogDirsByBrokerId
-            console.log('Found Kafka-2.0 Features.')
+            vm.KafkaPartitionState['with-offline-replicas'] = data.KafkaPartitionState['with-offline-replicas']
+            vm.KafkaPartitionState['under-min-isr'] = data.KafkaPartitionState['under-min-isr']
+            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = data.KafkaBrokerState.OfflineReplicaCountByBrokerId
+            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = data.KafkaBrokerState.OfflineLogDirsByBrokerId
+            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = data.KafkaBrokerState.OnlineLogDirsByBrokerId
           } catch (e) {
-            console.log('No kafka 2.0 features found')
+            // Kafka 2.0 features not available
           }
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }

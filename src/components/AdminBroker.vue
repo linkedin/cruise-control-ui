@@ -14,21 +14,27 @@
     </div>
     <div v-else-if='async'>
       <div class="alert alert-info text-center" v-if='showAsyncRefreshButton'>
-        <button class="btn btn-sm btn-secondary" @click='getProposals()'>⟳ Refresh View Now (Task-Id: {{ taskId }} )</button>
+        <button class="btn btn-sm btn-secondary" @click='getKafkaState()'>⟳ Refresh View Now</button>
       </div>
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if="!loaded && loading">
-      Loading Brokers ...
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else-if='loaded'>
+      <div class="form-inline mb-2">
+        <input type="text" class="form-control form-control-sm" v-model="adminFilterText" placeholder="Filter by Broker ID, Host, or Rack...">
+      </div>
       <table class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
-            <th>Broker</th>
-            <th>#Replicas </th>
-            <th>#Leaders</th>
-            <th>#Out of Sync Replicas</th>
+            <th @click='sortAdmin("bid")' style="cursor:pointer">Broker</th>
+            <th @click='sortAdmin("host")' style="cursor:pointer">Host</th>
+            <th @click='sortAdmin("rack")' style="cursor:pointer">Rack</th>
+            <th @click='sortAdmin("state")' style="cursor:pointer">State</th>
+            <th @click='sortAdmin("replicas")' style="cursor:pointer">#Replicas</th>
+            <th @click='sortAdmin("leaders")' style="cursor:pointer">#Leaders</th>
+            <th @click='sortAdmin("outofsync")' style="cursor:pointer">#Out of Sync Replicas</th>
             <template v-if='KafkaBrokerState.OfflineReplicaCountByBrokerId'>
               <!-- kafka 2.0 bits -->
               <th>#Offline Replicas</th>
@@ -39,24 +45,27 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for='(v, bid) in KafkaBrokerState.ReplicaCountByBrokerId' :class='brokerRowColor'>
-            <td>{{ bid }}</td>
-            <td>{{ v }}</td>
-            <td :class='!KafkaBrokerState.LeaderCountByBrokerId[bid] ? "table-danger" : null'>{{ KafkaBrokerState.LeaderCountByBrokerId[bid] || 0 }}</td>
-            <td :class='KafkaBrokerState.OutOfSyncCountByBrokerId[bid] > 0 ? "table-danger" : null'>{{ KafkaBrokerState.OutOfSyncCountByBrokerId[bid] || 0 }}</td>
+          <tr v-for='row in filteredAdminBrokers' :key='row.bid'>
+            <td>{{ row.bid }}</td>
+            <td>{{ row.host }}</td>
+            <td>{{ row.rack || 'N/A' }}</td>
+            <td><broker-state :state='row.state'></broker-state></td>
+            <td>{{ row.replicas }}</td>
+            <td :class='!row.leaders ? "table-danger" : null'>{{ row.leaders }}</td>
+            <td :class='row.outofsync > 0 ? "table-danger" : null'>{{ row.outofsync }}</td>
             <template v-if='KafkaBrokerState.OfflineReplicaCountByBrokerId'>
-              <td :class='KafkaBrokerState.OfflineReplicaCountByBrokerId[bid] ? "table-danger" : null'>
-                {{ KafkaBrokerState.OfflineReplicaCountByBrokerId[bid] ? KafkaBrokerState.OfflineReplicaCountByBrokerId[bid] : 0 }}
+              <td :class='row.offlineReplicas ? "table-danger" : null'>
+                {{ row.offlineReplicas }}
               </td>
               <td>
-                {{ KafkaBrokerState.OnlineLogDirsByBrokerId[bid] ? KafkaBrokerState.OnlineLogDirsByBrokerId[bid].length : 0 }}
+                {{ row.onlineLogDirs }}
               </td>
-              <td :class='KafkaBrokerState.OfflineLogDirsByBrokerId[bid].length > 0 ? "table-danger" : null'>
-                {{ KafkaBrokerState.OfflineLogDirsByBrokerId[bid] ? KafkaBrokerState.OfflineLogDirsByBrokerId[bid].length : 0 }}
+              <td :class='row.offlineLogDirs > 0 ? "table-danger" : null'>
+                {{ row.offlineLogDirs }}
               </td>
             </template>
             <td>
-              <input type="checkbox" v-model="selectedBrokers" :value='bid'/>
+              <input type="checkbox" v-model="selectedBrokers" :value='row.bid'/>
             </td>
           </tr>
         </tbody>
@@ -119,6 +128,10 @@
             </div>
           </div>
         </div>
+        <div class="form-group mt-2">
+          <label>Reason:</label>
+          <input class="form-control" type='text' v-model='reason' placeholder='Reason for this action (optional)'>
+        </div>
         <div class="text-right">
           <button @click='actionBroker' class="btn btn-primary">Run PLE</button>
         </div>
@@ -135,18 +148,27 @@
               <label class="form-check-label">DryRun</label>
             </div>
           </div>
+          <div class="col-md-4">
+            <div class="form-inline">
+              <label class="form-label">Intra-Broker Replication Throttle (bytes/sec):</label>
+              <input class="form-control" type='number' min=1 v-model='intra_broker_replication_throttle' placeholder='(CC Default)'>
+            </div>
+          </div>
+        </div>
+        <div class="form-group mt-2">
+          <label>Reason:</label>
+          <input class="form-control" type='text' v-model='reason' placeholder='Reason for this rebalance (optional)'>
         </div>
         <div class="text-right">
           <button @click='actionBroker' class="btn btn-primary">Run Broker Disk Rebalance</button>
         </div>
       </div>
 
-
       <!-- Rebalance Cluster Flags -->
       <div class="alert alert-info" v-if='actionName === "rebalance"'>
         <h5>Rebalance Cluster Flags</h5>
         <hr>
-        <form>
+        <form @submit.prevent>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" v-model='showAdvanced'>
             <label class="form-check-label">
@@ -165,15 +187,15 @@
           <div class="row">
             <div class="col-md-4">
               <h6>Choose Goals</h6>
-              <div class="form-check" v-for='g in allGoals.goals' v-if='!g.skip'>
-                <template v-if='g.group == 1'>
+              <template v-for='g in allGoals.goals'>
+              <div class="form-check" v-if='!g.skip && g.group == 1' :key='g.goal'>
                   <input class="form-check-input" type="checkbox" :value="g.goal" v-model='goals1' :disabled='disable_goals1'>
                   <label class="form-check-label" :title='g.description'>
                     <b v-if='g.hardGoal'>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</b>
                     <template v-else>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</template>
                   </label>
-                </template>
               </div>
+              </template>
             </div>
             <div class="col-md-4">
               <div class="form-group">
@@ -247,9 +269,19 @@
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
                 </div>
               </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+                </div>
+              </div>
             </div>
           </div>
           </template>
+          <div class="form-group mt-2">
+            <label>Reason:</label>
+            <input class="form-control" type='text' v-model='reason' placeholder='Reason for this rebalance (optional)'>
+          </div>
           <div class="text-right">
             <button @click.prevent='actionBroker' class="btn btn-primary" v-if='!showAdvanced'>Execute Rebalance With Default Options</button>
             <button @click.prevent='actionBroker' class="btn btn-primary" v-else>Execute Rebalance</button>
@@ -261,38 +293,49 @@
       <div class="alert alert-warning" v-if='selectedBrokers.length > 0 && actionName === "demote"'>
         <h5>Demote Broker Flags</h5>
         <hr>
-        <div class="row">
-          <div class="col-md-4">
-            <div class="form-inline">
-              <label class="form-label"> Concurrent Leader Movements </label>
-              <input type="number" class="form-input" v-model='concurrent_leader_movements' placeholder='(CC Default)'>
+        <form @submit.prevent>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" v-model='dryrun'>
+            <label class="form-check-label">DryRun</label>
+          </div>
+          <hr>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-inline">
+                <label class="form-label"> Concurrent Leader Movements </label>
+                <input type="number" class="form-input" v-model='concurrent_leader_movements' placeholder='(CC Default)'>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-inline">
+                <label class="form-label">Replication Throttle (bytes per second):</label>
+                <input class="form-input" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" v-model='disallow_capacity_estimation'>
+                <label class="form-check-label">
+                  Disallow Capacity Estimation
+                </label>
+              </div>
             </div>
           </div>
-          <div class="col-md-3">
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="checkbox" v-model='disallow_capacity_estimation'>
-              <label class="form-check-label">
-                Disallow Capacity Estimation
-              </label>
-            </div>
+          <div class="form-group mt-2">
+            <label>Reason:</label>
+            <input class="form-control" type='text' v-model='reason' placeholder='Reason for this action (optional)'>
           </div>
-          <div class="col-md-3">
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="checkbox" v-model='dryrun'>
-              <label class="form-check-label">DryRun</label>
-            </div>
-          </div>
-          <div class="col-md-2">
+          <div class="text-right">
             <button @click='actionBroker' class="btn btn-primary">Demote Brokers {{ selectedBrokers }}</button>
           </div>
-        </div>
+        </form>
       </div>
 
       <!-- Remove Broker Flags -->
       <div class="alert alert-danger" v-if='selectedBrokers.length > 0 && actionName === "remove"'>
         <h5>Remove Broker Flags</h5>
         <hr>
-        <form>
+        <form @submit.prevent>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" v-model='showAdvanced'>
             <label class="form-check-label">
@@ -310,15 +353,15 @@
           <div class="row">
             <div class="col-md-4">
               <h6>Choose Goals</h6>
-              <div class="form-check" v-for='g in allGoals.goals' v-if='!g.skip'>
-                <template v-if='g.group == 1'>
+              <template v-for='g in allGoals.goals'>
+              <div class="form-check" v-if='!g.skip && g.group == 1' :key='g.goal'>
                   <input class="form-check-input" type="checkbox" :value="g.goal" v-model='goals1' :disabled='disable_goals1'>
                   <label class="form-check-label" :title='g.description'>
                     <b v-if='g.hardGoal'>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</b>
                     <template v-else>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</template>
                   </label>
-                </template>
               </div>
+              </template>
             </div>
             <div class="col-md-4">
               <div class="form-group">
@@ -400,9 +443,19 @@
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
                 </div>
               </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+                </div>
+              </div>
             </div>
           </div>
           </template>
+          <div class="form-group mt-2">
+            <label>Reason:</label>
+            <input class="form-control" type='text' v-model='reason' placeholder='Reason for this action (optional)'>
+          </div>
           <div class="text-right">
             <button @click.prevent='actionBroker' class="btn btn-primary" v-if='!showAdvanced'>Remove Brokers {{ selectedBrokers }} With Default Options</button>
             <button @click.prevent='actionBroker' class="btn btn-primary" v-else>Remove Brokers {{ selectedBrokers }}</button>
@@ -414,7 +467,7 @@
       <div class="alert alert-success" v-if='selectedBrokers.length > 0 && actionName === "add"'>
         <h5>Add Broker Flags</h5>
         <hr>
-        <form>
+        <form @submit.prevent>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" v-model='showAdvanced'>
             <label class="form-check-label">
@@ -432,15 +485,15 @@
           <div class="row">
             <div class="col-md-4">
               <h6>Choose Goals</h6>
-              <div class="form-check" v-for='g in allGoals.goals' v-if='!g.skip'>
-                <template v-if='g.group == 1'>
+              <template v-for='g in allGoals.goals'>
+              <div class="form-check" v-if='!g.skip && g.group == 1' :key='g.goal'>
                   <input class="form-check-input" type="checkbox" :value="g.goal" v-model='goals1' :disabled='disable_goals1'>
                   <label class="form-check-label" :title='g.description'>
                     <b v-if='g.hardGoal'>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</b>
                     <template v-else>{{ g.goal.replace(/Goal/, '') | splitCamelCase }}</template>
                   </label>
-                </template>
               </div>
+              </template>
             </div>
             <div class="col-md-4">
               <div class="form-group">
@@ -521,9 +574,19 @@
                   <input class="form-control" type='number' min=0 v-model='concurrent_leader_movements' placeholder='(CC Default)'>
                 </div>
               </div>
+              <div class="form-row">
+                <label class="col-sm-6">Replication Throttle (bytes per second):</label>
+                <div class="col-sm-6">
+                  <input class="form-control" type='number' min=0 v-model='replication_throttle' placeholder='(CC Default)'>
+                </div>
+              </div>
             </div>
           </div>
           </template>
+          <div class="form-group mt-2">
+            <label>Reason:</label>
+            <input class="form-control" type='text' v-model='reason' placeholder='Reason for this action (optional)'>
+          </div>
           <div class="text-right">
             <button @click.prevent='actionBroker' class="btn btn-primary" v-if='!showAdvanced'>Add Brokers {{ selectedBrokers }} With Default Options</button>
             <button @click.prevent='actionBroker' class="btn btn-primary" v-else>Add Brokers {{ selectedBrokers }}</button>
@@ -538,7 +601,55 @@
         <div v-if='posted'>
           <div v-if='postResponse'>
             <button class="btn btn-info" @click='clearPostResponse'>Clear Response</button>
-            <exception :exception='postResponse'></exception>
+            <div v-if='dataParsed'>
+              <table class="table table-sm table-bordered">
+                <thead class="thead-light">
+                  <tr>
+                    <th>Replica Movements</th>
+                    <th>Leader Movements</th>
+                    <th>Recent Windows</th>
+                    <th>Data To Move</th>
+                    <th>Monitored Partitions %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ numReplicaMovements | formatNumber }}</td>
+                    <td>{{ numLeaderMovements | formatNumber }}</td>
+                    <td>{{ recentWindows | formatNumber }}</td>
+                    <td>{{ dataToMoveMB | formatUnits }}</td>
+                    <td>{{ monitoredPartitionsPercentage | formatDecimal }} %</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if='postError'>
+              <exception :exception='postResponse'></exception>
+            </div>
+            <div v-else>
+              <div class="alert alert-success">Action submitted successfully.</div>
+              <button class="btn btn-sm btn-outline-secondary mb-2" @click="showRawResponse = !showRawResponse">
+                {{ showRawResponse ? 'Hide' : 'Show' }} Raw Response
+              </button>
+              <pre v-if="showRawResponse" class="bg-light p-2 border" style="max-height:400px;overflow:auto;white-space:pre-wrap"><code>{{ typeof postResponse === 'string' ? postResponse : JSON.stringify(postResponse, null, 2) }}</code></pre>
+            </div>
+            <div v-if='!dataParsed && !postError && typeof postResponse === "object"'>
+              <h6>Response Summary</h6>
+              <table class="table table-sm table-bordered">
+                <thead class="thead-light">
+                  <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(val, key) in flatSummary" :key="key">
+                    <td>{{ key }}</td>
+                    <td>{{ val }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
           <div class='alert alert-success' v-else>
             Waiting for Response ...
@@ -553,6 +664,9 @@
 // import xssFilters from 'xss-filters'
 import goals from '@/goals'
 import BrokerState from '@/components/BrokerState'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
+const sortBy = require('lodash.sortby')
 
 export default {
   name: 'AdminBroker',
@@ -570,6 +684,10 @@ export default {
       loaded: false, // true if data is fetched at-least once
       error: false, // in case server sent non 200 OK Response
       errorData: null, // complete error data
+      async: false,
+      asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       selectedBrokers: [],
       // This is the response from the CC
       KafkaBrokerState: {
@@ -580,6 +698,9 @@ export default {
         LeaderCountByBrokerId: {},
         OfflineReplicaCountByBrokerId: {}
       },
+      brokerDetails: {}, // host, rack, state per broker from /load endpoint
+      adminFilterText: '',
+      adminSortColumn: 'bid', // column to sort admin broker table
       allGoals: goals, // goals from configuration
       /*
        * x                              Goals   Disallow-Capacity-Estimation   Skip-Hard-Goal-Check   Use-Ready-Default-Goals   Kafka-Assigner-Mode   Module
@@ -607,6 +728,9 @@ export default {
       excluded_topics: '', // Check CC Documentation
       concurrent_partition_movements_per_broker: null, // Check CC Documentation
       concurrent_leader_movements: null, // Check CC Documentation
+      replication_throttle: null, // Check CC Documentation
+      intra_broker_replication_throttle: null, // Check CC Documentation
+      reason: '', // Check CC Documentation
       throttle_removed_broker: false, // Check CC Documentation
       throttle_added_broker: false, // Check CC Documentation
       // workflow
@@ -615,27 +739,82 @@ export default {
       posted: false, // true if a POST method is made
       posturl: null, // POST url
       postResponse: '', // POST response from server
-      detectedUserTaskId: false // true in case the response has user-task-id
+      detectedUserTaskId: false, // true in case the response has user-task-id
+      postError: false, // true if the POST response is an error
+      showRawResponse: false, // toggle raw JSON response view
+      showAsyncRefreshButton: false, // show refresh button during async state
+      dataParsed: false,
+      numReplicaMovements: null,
+      recentWindows: null,
+      dataToMoveMB: null,
+      monitoredPartitionsPercentage: null,
+      numLeaderMovements: null
     }
   },
   created () {
     this.argsChanged()
   },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
+  },
   computed: {
-    taskId () {
-      return this.$store.getters.getTaskId(this.url)
-    },
     disableGoals () {
       return this.kafka_assigner || this.use_ready_default_goals
     },
-    brokerRowColor () {
-      return null
+    sortedAdminBrokers () {
+      const vm = this
+      const rows = Object.keys(vm.KafkaBrokerState.ReplicaCountByBrokerId).map(function (bid) {
+        const d = vm.brokerDetails[bid]
+        return {
+          bid: parseInt(bid, 10),
+          host: d ? d.Host : '',
+          rack: d && d.Rack && d.Rack !== d.Host ? d.Rack : '',
+          state: d ? d.BrokerState : '',
+          replicas: vm.KafkaBrokerState.ReplicaCountByBrokerId[bid] || 0,
+          leaders: vm.KafkaBrokerState.LeaderCountByBrokerId[bid] || 0,
+          outofsync: vm.KafkaBrokerState.OutOfSyncCountByBrokerId[bid] || 0,
+          offlineReplicas: vm.KafkaBrokerState.OfflineReplicaCountByBrokerId ? (vm.KafkaBrokerState.OfflineReplicaCountByBrokerId[bid] || 0) : 0,
+          onlineLogDirs: vm.KafkaBrokerState.OnlineLogDirsByBrokerId && vm.KafkaBrokerState.OnlineLogDirsByBrokerId[bid] ? vm.KafkaBrokerState.OnlineLogDirsByBrokerId[bid].length : 0,
+          offlineLogDirs: vm.KafkaBrokerState.OfflineLogDirsByBrokerId && vm.KafkaBrokerState.OfflineLogDirsByBrokerId[bid] ? vm.KafkaBrokerState.OfflineLogDirsByBrokerId[bid].length : 0
+        }
+      })
+      return sortBy(rows, vm.adminSortColumn)
+    },
+    filteredAdminBrokers () {
+      if (!this.adminFilterText) return this.sortedAdminBrokers
+      const q = this.adminFilterText.toLowerCase()
+      return this.sortedAdminBrokers.filter(b => {
+        return String(b.bid).includes(q) ||
+          (b.host && b.host.toLowerCase().includes(q)) ||
+          (b.rack && b.rack.toLowerCase().includes(q))
+      })
+    },
+    flatSummary () {
+      if (!this.postResponse || typeof this.postResponse !== 'object') return {}
+      const result = {}
+      const skip = ['loadBeforeOptimization', 'loadAfterOptimization', 'goalSummary', 'goals', 'summary']
+      Object.keys(this.postResponse).forEach(key => {
+        if (skip.indexOf(key) !== -1) return
+        const val = this.postResponse[key]
+        if (val === null || val === undefined) return
+        if (typeof val === 'object') return
+        result[key] = val
+      })
+      return result
     },
     actionURL () {
-      let vm = this
+      const vm = this
       // dryrun should always be there in URL
-      let params = {
+      const params = {
         dryrun: vm.dryrun
+      }
+      if (vm.reason && vm.reason.length > 0) {
+        params.reason = vm.reason
       }
       if (vm.actionName === 'remove' || vm.actionName === 'add' || vm.actionName === 'demote') {
         if (vm.selectedBrokers) {
@@ -643,6 +822,12 @@ export default {
         }
         if (vm.disallow_capacity_estimation) {
           params.allow_capacity_estimation = !vm.disallow_capacity_estimation
+        }
+        if (vm.concurrent_leader_movements) {
+          params.concurrent_leader_movements = vm.concurrent_leader_movements
+        }
+        if (vm.replication_throttle) {
+          params.replication_throttle = vm.replication_throttle
         }
       }
       if (vm.actionName === 'remove' || vm.actionName === 'add' || vm.actionName === 'rebalance') {
@@ -673,6 +858,9 @@ export default {
         if (vm.concurrent_leader_movements) {
           params.concurrent_leader_movements = vm.concurrent_leader_movements
         }
+        if (vm.replication_throttle) {
+          params.replication_throttle = vm.replication_throttle
+        }
         if (vm.excluded_topics && vm.excluded_topics.length > 0) {
           // Disable this due to https://github.com/linkedin/cruise-control-ui/issues/40
           // params.excluded_topics = xssFilters.uriQueryInDoubleQuotedAttr(vm.excluded_topics)
@@ -693,9 +881,10 @@ export default {
         //  &concurrent_partition_movements_per_broker=[concurrency]
         //  &concurrent_leader_movements=[concurrency]
         //  &throttle_removed_broker=[true/false]
+        //  &replication_throttle=[throttle]
         //  &json=[true/false]
         if (vm.throttle_removed_broker) {
-          params.throttle_removed_broker = params.throttle_removed_broker
+          params.throttle_removed_broker = vm.throttle_removed_broker
         }
         return vm.$helpers.getURL('remove_broker', params)
       }
@@ -706,6 +895,7 @@ export default {
         //  &json=[true/false]
         //  &allow_capacity_estimation=[true/false]
         //  &concurrent_leader_movements=[concurrency]
+        //  &replication_throttle=[throttle]
         return vm.$helpers.getURL('demote_broker', params)
       }
       if (vm.actionName === 'add') {
@@ -723,6 +913,7 @@ export default {
         //  &skip_hard_goal_check=[true/false]
         //  &excluded_topics=[TOPICS]
         //  &use_ready_default_goals=[true/false]
+        //  &replication_throttle=[throttle]
         if (vm.throttle_added_broker) {
           params.throttle_added_broker = vm.throttle_added_broker
         }
@@ -748,17 +939,23 @@ export default {
         //  &concurrent_partition_movements_per_broker=[concurrency]
         //  &concurrent_leader_movements=[concurrency]
         //  &excluded_topics=[TOPICS]
+        //  &replication_throttle=[throttle]
         return vm.$helpers.getURL('rebalance', params)
       }
       if (vm.actionName === 'rebalance_disk') {
         // POST /kafkacruisecontrol/rebalance
         // ?dryrun=[true/false]
         // ?rebalance_disk=true
+        // ?intra_broker_replication_throttle=[throttle]
+        // ?reason=[reason]
         params.rebalance_disk = 'true'
+        if (vm.intra_broker_replication_throttle) {
+          params.intra_broker_replication_throttle = vm.intra_broker_replication_throttle
+        }
 
         return vm.$helpers.getURL('rebalance', params)
       }
-      // console.log(' no url !')
+      return ''
     }
   },
   watch: {
@@ -800,9 +997,12 @@ export default {
         this.use_ready_default_goals = false
         this.kafka_assigner = false
         this.data_from = ''
-        this.excluded_topics = null
-        this.concurrent_partition_movements_per_broker = 0
-        this.concurrent_leader_movements = 0
+        this.excluded_topics = ''
+        this.concurrent_partition_movements_per_broker = null
+        this.concurrent_leader_movements = null
+        this.replication_throttle = null
+        this.intra_broker_replication_throttle = null
+        this.reason = ''
       }
     },
     group: function (ogroup, ngroup) {
@@ -817,47 +1017,101 @@ export default {
       } else {
         this.actionName = 'ple'
       }
+    },
+    adminFilterText () {
+      this.selectedBrokers = []
     }
   },
   methods: {
+    sortAdmin (col) {
+      this.adminSortColumn = col
+    },
     clearPostResponse () {
       this.posted = false
       this.postResponse = ''
+      this.postError = false
+      this.showRawResponse = false
+      this.dataParsed = false
+      this.numReplicaMovements = null
+      this.recentWindows = null
+      this.dataToMoveMB = null
+      this.monitoredPartitionsPercentage = null
+      this.numLeaderMovements = null
     },
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
-      this.newurl = newurl
       this.clearPostResponse()
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getKafkaState()
+      this.getBrokerDetails()
     },
     actionBroker () {
-      let vm = this
-      vm.posted = true
+      const vm = this
       this.clearPostResponse()
-      let params = {
+      vm.posted = true
+      vm.doPost(vm.actionURL)
+    },
+    doPost (url, retried) {
+      const vm = this
+      const params = {
         withCredentials: true
       }
-      // check if there is a running user-task-id for this end point in the $store
-      // let task = this.$store.getters.getTaskId('proposals')
-      let task = this.$store.getters.getTaskId(vm.actionURL)
-      if (task) {
-        params['headers'] = {
-          'User-Task-ID': task
-        }
-      }
-      this.$http.post(vm.actionURL, params).then((r) => {
-        // set this so that we know if the server sends user-task-id in the response
-        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
-        // store this task in local cache for future follow-up
-        let task = r.headers.hasOwnProperty('user-task-id') ? r.headers['user-task-id'] : null
-        vm.$store.commit('setTaskId', {url: vm.actionURL, taskid: task}) // save this task for follow-up calls (null deletes in vuex)
+      // User-Task-ID header is only for polling async GET requests, not for initiating new POST actions.
+      // Sending a stale task ID on a new POST causes CC to reject with "Unexpected header" error.
+      this.$http.post(url, null, params).then((r) => {
+        vm.detectedUserTaskId = Object.prototype.hasOwnProperty.call(r.headers, 'user-task-id')
         vm.posted = true
+        vm.postError = false
         vm.postResponse = r.data
+        const summary = (r.data && r.data.summary) || r.data
+        if (summary && typeof summary === 'object' && (summary.numReplicaMovements != null || summary.numLeaderMovements != null || summary.numIntraBrokerReplicaMovements != null)) {
+          vm.dataParsed = true
+          vm.numReplicaMovements = (summary.numReplicaMovements || summary.numIntraBrokerReplicaMovements) || 0
+          vm.numLeaderMovements = summary.numLeaderMovements
+          vm.recentWindows = summary.recentWindows
+          vm.dataToMoveMB = (summary.dataToMoveMB || summary.intraBrokerDataToMoveMB) || 0
+          vm.monitoredPartitionsPercentage = summary.monitoredPartitionsPercentage
+        }
       }, (e) => {
+        const errData = e && e.response ? e.response.data : null
+        const errMsg = typeof errData === 'string' ? errData : (errData && errData.errorMessage) || ''
+        // If CC doesn't support intra_broker_replication_throttle, retry without it (once)
+        if (!retried && e && e.response && e.response.status === 400 && errMsg.indexOf('intra_broker_replication_throttle') !== -1) {
+          const retryUrl = url.replace(/([?&])intra_broker_replication_throttle=[^&]*&?/, '$1').replace(/[?&]$/, '')
+          vm.intra_broker_replication_throttle = null
+          vm.doPost(retryUrl, true)
+          return
+        }
         vm.posted = true
-        vm.postResponse = e && e.response ? e.response.data : e
+        vm.postError = true
+        vm.postResponse = errData || e
+      })
+    },
+    getBrokerDetails () {
+      const vm = this
+      const url = vm.$helpers.getURL('load', { allow_capacity_estimation: true })
+      fetchCC(url).then((result) => {
+        if (result.type === 'success' && result.data && result.data.brokers) {
+          const details = {}
+          result.data.brokers.forEach(function (b) {
+            details[String(b.Broker)] = b
+          })
+          vm.brokerDetails = details
+        }
+      }).catch(() => {
+        // silently ignore - broker details are supplementary
       })
     },
     getKafkaState () {
@@ -865,42 +1119,51 @@ export default {
       vm.error = false
       vm.async = false
       vm.loading = true
-      let url = vm.$helpers.getURL('kafka_cluster_state')
-      // console.log(url)
-      this.$http.get(url, {withCredentials: true}).then((r) => {
-        // set this so that we know if the server sends user-task-id in the response
-        vm.detectedUserTaskId = r.headers.hasOwnProperty('user-task-id')
-        // do verify the state
-        if (r.data === null || r.data === undefined || r.data === '') {
+      const url = vm.$helpers.getURL('kafka_cluster_state')
+      fetchCC(url).then((result) => {
+        vm.detectedUserTaskId = result.headers.has('user-task-id')
+        if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.loaded = false
+          vm.error = true
+          vm.errorData = result.data || result.status
+        } else if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
           vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
           vm.showAsyncRefreshButton = true
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getKafkaState(), ASYNC_RETRY_DELAY)
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.error = false
           vm.errorData = null
           vm.loading = false
           vm.loaded = true
-          vm.KafkaBrokerState.ReplicaCountByBrokerId = r.data.KafkaBrokerState.ReplicaCountByBrokerId
-          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = r.data.KafkaBrokerState.OutOfSyncCountByBrokerId
-          vm.KafkaBrokerState.LeaderCountByBrokerId = r.data.KafkaBrokerState.LeaderCountByBrokerId
-          // only >= kafka 2.0 release
+          vm.showAsyncRefreshButton = false
+          const data = result.data
+          vm.KafkaBrokerState.ReplicaCountByBrokerId = data.KafkaBrokerState.ReplicaCountByBrokerId
+          vm.KafkaBrokerState.OutOfSyncCountByBrokerId = data.KafkaBrokerState.OutOfSyncCountByBrokerId
+          vm.KafkaBrokerState.LeaderCountByBrokerId = data.KafkaBrokerState.LeaderCountByBrokerId
           try {
-            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = r.data.KafkaBrokerState.OfflineReplicaCountByBrokerId
-            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = r.data.KafkaBrokerState.OfflineLogDirsByBrokerId
-            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = r.data.KafkaBrokerState.OnlineLogDirsByBrokerId
-            console.log('Found Kafka-2.0 Features.')
+            vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = data.KafkaBrokerState.OfflineReplicaCountByBrokerId
+            vm.KafkaBrokerState.OfflineLogDirsByBrokerId = data.KafkaBrokerState.OfflineLogDirsByBrokerId
+            vm.KafkaBrokerState.OnlineLogDirsByBrokerId = data.KafkaBrokerState.OnlineLogDirsByBrokerId
           } catch (e) {
-            console.log('No kafka 2.0 features found')
+            // Kafka 2.0 features not available
           }
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e
       })
     }
   }

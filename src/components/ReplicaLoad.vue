@@ -17,7 +17,7 @@
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if="!loaded && loading">
-      Loading ...
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else-if="loaded && loading">
       Fetching New Data ...
@@ -39,33 +39,31 @@
       <tbody>
         <template v-for="rack in racks">
           <template v-for="host in rack.hosts">
-            <template v-for="broker in host.brokers" v-if='broker.replicas.length > 0'>
-              <template v-for="replica in broker.replicas">
-                <tr>
+            <template v-for="broker in host.brokers">
+              <tr v-if='!broker.replicas || broker.replicas.length === 0' :key="'empty-' + rack.rackid + '-' + broker.brokerid">
+                <td>{{ rack.rackid }}</td>
+                <td>{{ host.name | formatHost }}</td>
+                <td>{{ broker.brokerid }}</td>
+                <td colspan=6 class='alert alert-warning text-center'>No replica details available.</td>
+              </tr>
+              <template v-else v-for="replica in broker.replicas">
+                <tr :key="broker.brokerid + '-' + replica.topic + '-' + replica.partition">
                   <td>{{ rack.rackid }}</td>
                   <td>{{ host.name | formatHost }}</td>
                   <td>{{ broker.brokerid }}</td>
                   <td>{{ replica.topic + '-' + replica.partition }}</td>
                   <td>{{ replica.isLeader }}</td>
-                  <template v-if='replica.load && replica.load.snapshots'>
+                  <template v-if='replica.load && replica.load.snapshots && replica.load.snapshots.length > 0'>
                   <td>{{ replica.load.snapshots[0].disk | formatUnits }}</td>
                   <td>{{ replica.load.snapshots[0].cpu.toFixed(0) }}</td>
-                  <td>{{ replica.load.snapshots[0].networkOutbound | formatNetworkUnits }}</td>
                   <td>{{ replica.load.snapshots[0].networkInbound | formatNetworkUnits }}</td>
+                  <td>{{ replica.load.snapshots[0].networkOutbound | formatNetworkUnits }}</td>
                   </template>
                   <template v-else>
                   <td colspan=6 class='alert alert-warning text-center'>No Load data available.</td>
                   </template>
                 </tr>
               </template>
-            </template>
-            <template v-for="broker in host.brokers" v-else>
-              <tr>
-                <td>{{ rack.rackid }}</td>
-                <td>{{ host.name | formatHost }}</td>
-                <td>{{ broker.brokerid }}</td>
-                <td colspan=6 class='alert alert-warning text-center'>No replica details available.</td>
-              </tr>
             </template>
           </template>
         </template>
@@ -75,6 +73,9 @@
 </template>
 
 <script>
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
+
 export default {
   name: 'ReplicaLoad',
   props: {
@@ -83,22 +84,31 @@ export default {
   },
   data () {
     return {
-      stopRefresh: false,
       loading: false,
       loaded: false,
       error: false,
       errorData: null,
       async: false,
       asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       tos: false,
       racks: []
     }
   },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
+  },
   watch: {
-    group: (ngroup) => {
+    group: function (ogroup, ngroup) {
       this.argsChanged()
     },
-    cluster: (ncluster) => {
+    cluster: function (ocluster, ncluster) {
       this.argsChanged()
     }
   },
@@ -107,7 +117,7 @@ export default {
       return this.$store.state.hideHelperURL
     },
     url: function () {
-      return this.$helpers.getURL('replicaload', {granularity: 'replica'})
+      return this.$helpers.getURL('replicaload', { granularity: 'replica' })
     }
   },
   methods: {
@@ -115,36 +125,72 @@ export default {
       this.tos = true
       this.getReplicaLoad()
     },
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
-      this.newurl = newurl
-      this.getReplicaLoad()
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
+      if (this.tos) {
+        this.getReplicaLoad()
+      }
     },
     getReplicaLoad () {
-      let vm = this
+      const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      const fetchOptions = {}
+      const task = this.$store.getters.getTaskId(vm.url)
+      if (task) {
+        fetchOptions.headers = { 'User-Task-ID': task }
+      }
+      fetchCC(vm.url, fetchOptions).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
+          const taskId = result.headers.has('user-task-id') ? result.headers.get('user-task-id') : null
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: taskId })
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          // Only auto-retry if we have a task ID to poll; without one, each
+          // retry starts a new expensive computation on CC.
+          if (taskId) {
+            vm.asyncRetryTimer = setTimeout(() => vm.getReplicaLoad(), ASYNC_RETRY_DELAY)
+          }
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
           vm.loading = false
           vm.error = false
           vm.errorData = null
-          vm.racks = r.data.racks || []
+          vm.racks = result.data.racks || []
           vm.loaded = true
+          // Clear the cached task ID so the next request fetches fresh data
+          vm.$store.commit('setTaskId', { url: vm.url, taskid: null })
         }
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.error = true
         vm.loading = false
         vm.racks = []
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   }
