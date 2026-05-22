@@ -20,16 +20,46 @@
     </div>
     <div v-else>
 
+      <div class="card-deck mb-3">
+        <div class="card text-center">
+          <div class="card-header">Balancedness Score</div>
+          <div class="card-body">
+            <h1 :class="['card-text', Number(AnomalyDetectorState.balancednessScore) === 100 ? 'text-success' : 'text-warning']">{{ AnomalyDetectorState.balancednessScore }}%</h1>
+          </div>
+        </div>
+        <div class="card text-center">
+          <div class="card-header">Self Healings Started</div>
+          <div class="card-body">
+            <h1 :class="['card-text', AnomalyDetectorState.metrics.numSelfHealingStarted > 0 ? 'text-success' : null]">{{ AnomalyDetectorState.metrics.numSelfHealingStarted }}</h1>
+          </div>
+        </div>
+        <div class="card text-center">
+          <div class="card-header">Self Healings Failed to Start</div>
+          <div class="card-body">
+            <h1 :class="['card-text', AnomalyDetectorState.metrics.numSelfHealingFailedToStart > 0 ? 'text-danger' : 'text-success']">{{ AnomalyDetectorState.metrics.numSelfHealingFailedToStart }}</h1>
+          </div>
+        </div>
+        <div class="card text-center">
+          <div class="card-header">Avg Minutes To Start Fix</div>
+          <div class="card-body">
+            <h1>{{ Number(AnomalyDetectorState.metrics.meanTimeToStartFixMs / 60000).toFixed(1) }}</h1>
+          </div>
+        </div>
+      </div>
+
       <div>
         <h4>Self Healing Status</h4>
-        <table class="table table-sm table-bordered" >
+        <table class="table table-sm table-bordered">
           <tbody>
             <tr>
               <th>Healing Disabled For</th>
               <td>
                 <b v-if='AnomalyDetectorState.selfHealingDisabled.length == 0'>None</b>
                 <ul v-else class="list-group">
-                  <li class="list-group-item" v-for='(d, idx) in AnomalyDetectorState.selfHealingDisabled' :key='idx'>{{ d }}</li>
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for='(d, idx) in AnomalyDetectorState.selfHealingDisabled' :key='idx'>
+                    {{ d }}
+                    <span class="badge badge-primary badge-pill ml-3">{{ Number(AnomalyDetectorState.selfHealingEnabledRatio[d] * 100).toFixed(0) }}%</span>
+                  </li>
                 </ul>
               </td>
             </tr>
@@ -38,7 +68,10 @@
               <td>
                 <b v-if='AnomalyDetectorState.selfHealingEnabled.length == 0'>None</b>
                 <ul v-else class="list-group">
-                  <li class="list-group-item" v-for='(d, idx) in AnomalyDetectorState.selfHealingEnabled' :key='idx'>{{ d }}</li>
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for='(d, idx) in AnomalyDetectorState.selfHealingEnabled' :key='idx'>
+                    {{ d }}
+                    <span class="badge badge-primary badge-pill ml-3">{{ Number(AnomalyDetectorState.selfHealingEnabledRatio[d] * 100).toFixed(0) }}%</span>
+                  </li>
                 </ul>
               </td>
             </tr>
@@ -46,26 +79,60 @@
         </table>
       </div>
 
+      <div v-if='AnomalyDetectorState.recentDiskFailures && AnomalyDetectorState.recentDiskFailures.length > 0'>
+        <h4>Recent Disk Failures</h4>
+        <table class="table table-sm table-bordered">
+          <thead>
+            <tr>
+              <th>DetectionTime</th>
+              <th>Failed Disks</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for='(r, ridx) in AnomalyDetectorState.recentDiskFailures' :key='ridx'>
+              <td class="align-middle text-center">{{ r.detectionMs | formatLocalTime }}</td>
+              <td>
+                <ul class="list-group">
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(broker, bid) in r.failedDisksByTimeMs" :key='bid'>
+                    {{  bid }}
+                    <ul class="list-group" v-for="disk in Object.keys(broker)" :key='disk'>
+                      <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <code>{{ disk }}</code>
+                        <span class="badge badge-primary badge-pill ml-3">{{ broker[disk] | formatLocalTime }}</span>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </td>
+              <td class="align-middle text-center">{{ r.status }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div v-if='AnomalyDetectorState.recentBrokerFailures && AnomalyDetectorState.recentBrokerFailures.length > 0'>
         <h4>Recent Broker Failures</h4>
-        <table class="table table-sm table-bordered" >
+        <table class="table table-sm table-bordered">
           <thead>
             <tr>
               <th>DetectionTime</th>
               <th>Failed Brokers</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for='(r, ridx) in AnomalyDetectorState.recentBrokerFailures' :key='ridx'>
-              <td>{{ r.detectionMs | formatLocalTime }} ago</td>
+              <td class="align-middle text-center">{{ r.detectionMs | formatLocalTime }}</td>
               <td>
                 <ul class="list-group">
                   <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(time, broker) in r.failedBrokersByTimeMs" :key='broker'>
                     {{ broker }}
-                    <span class="badge badge-primary badge-pill">{{ time | formatLocalTime }} ago</span>
+                    <span class="badge badge-primary badge-pill">{{ time | formatLocalTime }}</span>
                   </li>
                 </ul>
               </td>
+              <td class="align-middle text-center">{{ r.status }}</td>
             </tr>
           </tbody>
         </table>
@@ -78,11 +145,12 @@
             <tr>
               <th>DetectionTime</th>
               <th>Violated Goals</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(r, ridx) in AnomalyDetectorState.recentGoalViolations" :key='ridx'>
-              <td>{{ r.detectionMs | formatLocalTime }} ago</td>
+              <td class="align-middle text-center">{{ r.detectionMs | formatLocalTime }}</td>
               <td>
                 <!-- Depedning on the version of CC we use, two types of responses are being sent out -->
                 <template v-if='r.hasOwnProperty("violatedGoals")'>
@@ -103,6 +171,7 @@
                   <div class="alert alert-info" v-else>None</div>
                 </template>
               </td>
+              <td class="align-middle text-center">{{ r.status }}</td>
             </tr>
           </tbody>
         </table>
@@ -110,17 +179,39 @@
 
       <div v-if='AnomalyDetectorState.recentMetricAnomalies && AnomalyDetectorState.recentMetricAnomalies.length > 0'>
         <h4>Recent Metric Anomalies</h4>
-        <table class="table table-sm table-bordered" >
+        <table class="table table-sm table-bordered">
           <thead>
             <tr>
               <th>DetectionTime</th>
               <th>Description</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for='(r, ridx) in AnomalyDetectorState.recentMetricAnomalies' :key='ridx'>
-              <td>{{ r.detectionMs | formatLocalTime }} ago</td>
+              <td class="align-middle text-center">{{ r.detectionMs | formatLocalTime }}</td>
               <td>{{ r.description }}</td>
+              <td class="align-middle text-center">{{ r.status }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if='AnomalyDetectorState.recentTopicAnomalies && AnomalyDetectorState.recentTopicAnomalies.length > 0'>
+        <h4>Recent Topic Anomalies</h4>
+        <table class="table table-sm table-bordered">
+          <thead>
+            <tr>
+              <th>DetectionTime</th>
+              <th>Description</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for='(r, ridx) in AnomalyDetectorState.recentTopicAnomalies' :key='ridx'>
+              <td class="align-middle text-center">{{ r.detectionMs | formatLocalTime }}</td>
+              <td>{{ r.description }}</td>
+              <td class="align-middle text-center">{{ r.status }}</td>
             </tr>
           </tbody>
         </table>
@@ -151,11 +242,15 @@ export default {
       argsRetryTimer: null,
       asyncRetryTimer: null,
       AnomalyDetectorState: {
+        balancednessScore: 0,
+        metrics: {},
         selfHealingDisabled: [],
         selfHealingEnabled: [],
+        selfHealingEnabledRatio: {},
         recentBrokerFailures: [],
         recentMetricAnomalies: [],
-        recentGoalViolations: []
+        recentGoalViolations: [],
+        recentTopicAnomalies: []
       }
     }
   },
@@ -231,6 +326,10 @@ export default {
           vm.loading = false
           const defaults = { selfHealingDisabled: [], selfHealingEnabled: [], recentBrokerFailures: [], recentMetricAnomalies: [], recentGoalViolations: [] }
           vm.$set(vm, 'AnomalyDetectorState', Object.assign(defaults, result.data.AnomalyDetectorState))
+          vm.AnomalyDetectorState.recentBrokerFailures.sort((a, b) => a.detectionMs - b.detectionMs)
+          vm.AnomalyDetectorState.recentMetricAnomalies.sort((a, b) => a.detectionMs - b.detectionMs)
+          vm.AnomalyDetectorState.recentGoalViolations.sort((a, b) => a.detectionMs - b.detectionMs)
+          vm.AnomalyDetectorState.recentTopicAnomalies.sort((a, b) => a.detectionMs - b.detectionMs)
           vm.loaded = true
         }
       }).catch((e) => {

@@ -1,7 +1,6 @@
 <!-- Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. -->
 <template>
   <div>
-    <h4>Kafka Server Load</h4>
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>

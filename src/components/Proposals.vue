@@ -23,16 +23,22 @@
       <div class="alert alert-info">
         <b>Help:</b>This page shows the state of the kafka cluster based on the optimized load calculation. Values before and after optimized load are shown respectively.
       </div>
-
-      <h4>Proposal Changes</h4>
+      <div class="form-group">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" v-model='rebalanceDisk' @change="onRebalanceDisk">
+          <label class="form-check-label" title="In large clusters, this can take minutes to respond, so please be patient and don't overload the server by repeatingly switching this checkbox or moving between tabs"> Switch to "Intra Broker Rebalance Disk Proposal" ❓</label>
+        </div>
+      </div>
+      <h4><template v-if="rebalanceDisk">Intra Broker Rebalance Disk</template> Proposal Changes Summary</h4>
       <table class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
-            <th>Number of Replica Movements</th>
-            <th>Number of Leader Movements</th>
+            <th># Replica Movements</th>
+            <th># Leader Movements</th>
             <th>Recent Windows</th>
             <th>Data to Move</th>
-            <th>Monitored Partitions Coverage</th>
+            <th>Monitored Partitions</th>
+            <th>Balancedness Score</th>
           </tr>
         </thead>
         <tbody>
@@ -42,51 +48,19 @@
             <td>{{ recentWindows }}</td>
             <td>{{ dataToMoveMB | formatUnits }}</td>
             <td>{{ monitoredPartitionsPercentage ? monitoredPartitionsPercentage.toFixed(2) : null }}%</td>
+            <td :class="onDemandBalancednessScoreAfter - onDemandBalancednessScoreBefore > 0 ? 'text-success' : null">{{ onDemandBalancednessScoreBefore }}% → {{ onDemandBalancednessScoreAfter }}%</td>
           </tr>
         </tbody>
       </table>
 
-      <h4 class="pointer" @click="showBrokerLoad = !showBrokerLoad">
-        Optimized Load Difference - Per Broker
-        <small class="text-muted">{{ showBrokerLoad ? '(click to hide)' : '(click to show)' }}</small>
-      </h4>
-      <table v-if="showBrokerLoad" class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <th>Broker ID</th>
-            <th v-for="h in brokerLoad.heading" :key="'bh-'+h">{{ h }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(brokerdata, brokerid) in brokerLoad.records" :key="brokerid">
-            <th>{{ brokerid }}</th>
-            <td v-for="h in brokerLoad.heading" :key="'bd-'+h">
-              <diff-cell :head='h' :cell='brokerdata[h]' :showpct='showpct' />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <load-diff-table :per="'broker'" :loadBefore="loadBefore" :loadAfter="loadAfter"></load-diff-table>
+      <load-diff-table :per="'host'" :loadBefore="loadBefore" :loadAfter="loadAfter"></load-diff-table>
 
-      <h4 class="pointer" @click="showHostLoad = !showHostLoad">
-        Optimized Load Difference - Per Host
-        <small class="text-muted">{{ showHostLoad ? '(click to hide)' : '(click to show)' }}</small>
+      <h4 class="pointer" @click="showMovements = !showMovements">
+        Proposed Partition Movements ({{ movements.length }})
+        <small class="text-muted">{{ showMovements ? '(click to hide)' : '(click to show)' }}</small>
       </h4>
-      <table v-if="showHostLoad" class="table table-sm table-bordered">
-        <thead class="thead-light">
-          <tr>
-            <!-- <th>Host</th> -->
-            <th v-for="h in hostLoad.heading" :key="'hh-'+h">{{ h }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(hostdata, host) in hostLoad.records" :key="host">
-            <!-- <th>{{ host }}</th> -->
-            <td v-for="h in hostLoad.heading" :key="'hd-'+h">
-              <diff-cell :head='h' :cell='hostdata[h]' :showpct='showpct' />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <inter-broker-movement-table v-if="showMovements" title="" :movements="movements"></inter-broker-movement-table>
 
       <h4 class="pointer" @click="showGoals = !showGoals">
         Goals
@@ -119,8 +93,9 @@
 </template>
 
 <script>
-import DiffCell from '@/components/DiffCell'
 import Goal from '@/components/Goal'
+import LoadDiffTable from '@/components/LoadDiffTable'
+import InterBrokerMovementTable from '@/components/InterBrokerMovementTable'
 import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
 import fetchCC from '@/fetchCC'
 
@@ -131,8 +106,9 @@ export default {
     cluster: String
   },
   components: {
-    DiffCell,
-    Goal
+    Goal,
+    LoadDiffTable,
+    InterBrokerMovementTable
   },
   data () {
     return {
@@ -144,20 +120,22 @@ export default {
       asyncData: null,
       argsRetryTimer: null,
       asyncRetryTimer: null,
+      rebalanceDisk: false,
       // top level medatadata
       numReplicaMovements: null,
       recentWindows: null,
       dataToMoveMB: null,
       monitoredPartitionsPercentage: null,
+      onDemandBalancednessScoreBefore: null,
+      onDemandBalancednessScoreAfter: null,
       numLeaderMovements: null,
       // optimized data
       loadBefore: {},
       loadAfter: {},
+      proposals: [],
       goals: [],
       // show percentage diff
-      showpct: false,
-      showBrokerLoad: true,
-      showHostLoad: true,
+      showMovements: false,
       showGoals: true,
       showAsyncRefreshButton: false,
       detectedUserTaskId: false // true in case the response has user-task-id
@@ -192,121 +170,17 @@ export default {
     url () {
       // loadBeforeOptimization is removed and is available only when
       // we pass verbose=true flag
-      return this.$helpers.getURL('proposals', { verbose: true })
+      return this.$helpers.getURL('proposals', { rebalance_disk: this.rebalanceDisk, verbose: true })
     },
-    hostLoad () {
-      const hostMap = [
-        {}, // before load
-        {} // after load
-      ]
-      const unified = {}
-      if (!this.loadBefore.brokers || !this.loadAfter.brokers || !this.loadBefore.hosts || !this.loadAfter.hosts) return { heading: [], records: [] }
-      // re-key them based on the broker-id
-      const hostnames = []
-      this.loadBefore.hosts.forEach((rec) => {
-        hostnames.push(rec.Host)
-        hostMap[0][rec.Host] = rec
-      })
-      this.loadAfter.hosts.forEach((rec) => {
-        hostMap[1][rec.Host] = rec
-      })
-      const numKeys = [
-        'FollowerNwInRate',
-        'Leaders',
-        'DiskMB',
-        'PnwOutRate',
-        'NwOutRate', // was NnwOutRate
-        'CpuPct',
-        'Replicas',
-        'LeaderNwInRate'
-      ]
-      const strKeys = [
-        'Host'
-      ]
-      const allKeys = [...strKeys, ...numKeys]
-      hostnames.forEach((host) => {
-        const before = hostMap[0][host] || {}
-        const after = hostMap[1][host] || {}
-        const diff = {}
-        numKeys.forEach((key) => {
-          diff[key] = {
-            before: before[key],
-            after: after[key],
-            diff: (before[key] || 0) - (after[key] || 0)
-          }
-        })
-        strKeys.forEach((key) => {
-          diff[key] = {
-            before: before[key],
-            after: after[key],
-            diff: null
-          }
-        })
-        unified[host] = diff
-      })
-      return {
-        heading: allKeys,
-        records: unified
-      }
-    },
-    brokerLoad () {
-      const brokerMap = [
-        {}, // before load
-        {} // after load
-      ]
-      const unified = {}
-      if (!this.loadBefore.brokers || !this.loadAfter.brokers) return { heading: [], records: [] }
-      // re-key them based on the broker-id
-      const brokerids = []
-      this.loadBefore.brokers.forEach((rec) => {
-        brokerids.push(rec.Broker)
-        brokerMap[0][rec.Broker] = rec
-      })
-      this.loadAfter.brokers.forEach((rec) => {
-        brokerMap[1][rec.Broker] = rec
-      })
-      const numKeys = [
-        'FollowerNwInRate',
-        'Leaders',
-        'DiskMB',
-        'PnwOutRate',
-        'NwOutRate', // was NnwOutRate
-        'CpuPct',
-        'Replicas',
-        'LeaderNwInRate'
-      ]
-      const strKeys = [
-        'BrokerState',
-        'Host'
-      ]
-      const allKeys = [...strKeys, ...numKeys]
-      brokerids.forEach((broker) => {
-        const before = brokerMap[0][broker] || {}
-        const after = brokerMap[1][broker] || {}
-        const diff = {}
-        numKeys.forEach((key) => {
-          diff[key] = {
-            before: before[key],
-            after: after[key],
-            diff: (before[key] || 0) - (after[key] || 0)
-          }
-        })
-        strKeys.forEach((key) => {
-          diff[key] = {
-            before: before[key],
-            after: after[key],
-            diff: null
-          }
-        })
-        unified[broker] = diff
-      })
-      return {
-        heading: allKeys,
-        records: unified
-      }
+    movements () {
+      return this.proposals.map(item => ({ proposal: item }))
     }
   },
   methods: {
+    onRebalanceDisk () {
+      this.loaded = false
+      this.argsChanged()
+    },
     argsChanged (retries) {
       retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
@@ -366,13 +240,16 @@ export default {
           const data = result.data
           // Newer CC versions nest under data.summary; older versions put fields at top level
           const summary = data.summary || data
-          vm.numReplicaMovements = summary.numReplicaMovements
+          vm.numReplicaMovements = (summary.numReplicaMovements && summary.numReplicaMovements) || summary.numIntraBrokerReplicaMovements
           vm.recentWindows = summary.recentWindows
-          vm.dataToMoveMB = summary.dataToMoveMB != null ? summary.dataToMoveMB : summary.intraBrokerDataToMoveMB
+          vm.dataToMoveMB = (summary.dataToMoveMB && summary.dataToMoveMB) || summary.intraBrokerDataToMoveMB
           vm.monitoredPartitionsPercentage = summary.monitoredPartitionsPercentage
+          vm.onDemandBalancednessScoreBefore = Number(summary.onDemandBalancednessScoreBefore).toFixed(0)
+          vm.onDemandBalancednessScoreAfter = Number(summary.onDemandBalancednessScoreAfter).toFixed(0)
           vm.numLeaderMovements = summary.numLeaderMovements
           vm.$set(vm, 'loadBefore', data.loadBeforeOptimization || {})
           vm.$set(vm, 'loadAfter', data.loadAfterOptimization || {})
+          vm.$set(vm, 'proposals', data.proposals || [])
           if (Object.prototype.hasOwnProperty.call(data, 'goalSummary')) {
             vm.$set(vm, 'goals', data.goalSummary || [])
           } else {

@@ -23,16 +23,17 @@
         </div>
         <div class="form-row">
           <div class="form-group col-md-8">
-            <label for="inputAddress">Topic <b title="Topics takes  Regular Expression">❓</b></label>
+            <label for="inputAddress">Topic Regex</label>
+            <button class="btn btn-info btn-sm" style="padding:1px 4px; font-size:12px;" title="Effectively shows partition-0 load for all topics" @click.prevent='showTopicsList()'>❔ Show Topics List</button>
             <input type="text" class="form-control" v-model='topicName'>
           </div>
           <div class="form-group col-md-2">
             <label for="inputAddress">Min Partition #</label>
-            <input type="number" min="0" class="form-control" v-model='partitionRangeMin'>
+            <input type="number" min="-1" class="form-control" v-model='partitionRangeMin' @change="onPartitionMinChanged">
           </div>
           <div class="form-group col-md-2">
             <label for="inputAddress">Max Partition #</label>
-            <input type="number" min="0" class="form-control" v-model='partitionRangeMax'>
+            <input type="number" min="-1" class="form-control" v-model='partitionRangeMax' @change="onPartitionMaxChanged">
           </div>
         </div>
         <!-- TODO: Use date/time picker which requies jquery
@@ -113,8 +114,14 @@
       <transition-group name="fade" tag="tbody">
         <tr :key='r.topic + "-" + r.partition' v-for="r in records">
           <td v-for='(hv, hk) in header' :key="hk">
-            <template v-if='colUnits[hk] === "float"'>
-              {{ r[hv] != null ? r[hv].toFixed(2) : '' }}
+            <template v-if='colUnits[hk] === "disk"'>
+              {{ r[hv] != null ? r[hv] : '' | formatUnits }}
+            </template>
+            <template v-else-if='colUnits[hk] === "pct"'>
+              {{ r[hv] != null ? Number(r[hv]).toFixed(2) : '' }}%
+            </template>
+            <template v-else-if='colUnits[hk] === "network"'>
+              {{ r[hv] != null ? r[hv] : '' | formatNetworkUnits }}
             </template>
             <template v-else-if='colUnits[hk] === "int"'>
               {{ r[hv] != null ? parseInt(r[hv], 10) : '' }}
@@ -165,8 +172,8 @@ export default {
       allowCapacityEstimation: true,
       maxLoad: false,
       topicName: '',
-      partitionRangeMin: 0,
-      partitionRangeMax: 0,
+      partitionRangeMin: -1,
+      partitionRangeMax: -1,
       startTimestamp: 0,
       endTimestamp: 0,
       minValidPartitionRatio: 0,
@@ -222,7 +229,7 @@ export default {
         params.topic = this.topicName.replace(/^\s+|\s+$/, '')
         params.topic = xssFilters.uriQueryInHTMLData(params.topic)
       }
-      if (this.partitionRangeMin > 0 && this.partitionRangeMax > this.partitionRangeMin) {
+      if (this.partitionRangeMin >= 0 && this.partitionRangeMax >= this.partitionRangeMin) {
         params.partition = this.partitionRangeMin + '-' + this.partitionRangeMax
       }
       if (this.startTimestamp > 0 && this.endTimestamp > this.startTimestamp) {
@@ -236,9 +243,33 @@ export default {
     }
   },
   methods: {
+    onPartitionMinChanged () {
+      if (this.partitionRangeMax < this.partitionRangeMin) {
+        this.partitionRangeMax = this.partitionRangeMin
+      }
+      return null
+    },
+    onPartitionMaxChanged () {
+      if (this.partitionRangeMin > this.partitionRangeMax) {
+        this.partitionRangeMin = this.partitionRangeMax
+      }
+      return null
+    },
     acceptTos () {
       this.tos = true
       this.getPartitionLoad()
+    },
+    showTopicsList () {
+      const tempMin = this.partitionRangeMin
+      const tempMax = this.partitionRangeMax
+      const tempTopic = this.topicName
+      this.partitionRangeMin = 0
+      this.partitionRangeMax = 0
+      this.topicName = ''
+      this.getPartitionLoad()
+      this.partitionRangeMin = tempMin
+      this.partitionRangeMax = tempMax
+      this.topicName = tempTopic
     },
     argsChanged (retries) {
       retries = retries || 0
@@ -304,10 +335,10 @@ export default {
           vm.records = result.data.records || []
           if (vm.apiMinorVersion === 2) {
             vm.header = ['topic', 'partition', 'leader', 'followers', 'cpu', 'disk', 'networkInbound', 'networkOutbound', 'msg_in']
-            vm.colUnits = ['str', 'int', 'int', 'list', 'float', 'float', 'float', 'float', 'int']
+            vm.colUnits = ['str', 'int', 'int', 'list', 'pct', 'disk', 'network', 'network', 'int']
           } else {
             vm.header = ['topic', 'partition', 'leader', 'followers', 'CPU', 'DISK', 'NW_IN', 'NW_OUT', 'MSG_IN']
-            vm.colUnits = ['str', 'int', 'int', 'list', 'float', 'float', 'float', 'float', 'int']
+            vm.colUnits = ['str', 'int', 'int', 'list', 'pct', 'disk', 'network', 'network', 'int']
           }
           // Clear the cached task ID so the next refresh fetches fresh data
           vm.$store.commit('setTaskId', { url: vm.url, taskid: null })

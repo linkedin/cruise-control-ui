@@ -240,7 +240,7 @@ export default {
     },
     bootstrapMetrics () {
       const vm = this
-      fetchCC(vm.bootstrapUrl, { method: 'POST' }).then((result) => {
+      fetchCC(vm.bootstrapUrl, { method: 'GET' }).then((result) => {
         if (result.type === 'error') {
           vm.error = true
           vm.errorData = (result.data && result.data.errorMessage) || result.data

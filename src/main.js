@@ -26,6 +26,9 @@ Vue.config.productionTip = false
 
 // disk is already in MB
 Vue.filter('formatUnits', function (v) {
+  if (v === 'DEAD') {
+    return 'N/A'
+  }
   v = v * 1024 * 1024
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
   for (let i = 0; i < units.length; i++) {
@@ -44,7 +47,7 @@ Vue.filter('formatNetworkUnits', function (v) {
   for (let i = 0; i < units.length; i++) {
     if (v <= Math.pow(1024, i + 1)) {
       let value = v / Math.pow(1024, i)
-      value = value.toFixed(0)
+      value = value.toFixed(1)
       return value + ' ' + units[i]
     }
   }
@@ -76,8 +79,30 @@ Vue.filter('splitCamelCase', function (v) {
 })
 
 Vue.filter('formatLocalTime', function (v) {
-  const d = new Date() / 1000
-  return Number((d - v / 1000)).toFixed(0) + ' secs'
+  const diff = Math.floor((Date.now() - v) / 1000)
+
+  const d = Math.floor(diff / 86400)
+  const h = Math.floor((diff % 86400) / 3600)
+  const m = Math.floor((diff % 3600) / 60)
+  const s = diff % 60
+
+  if (d > 0) {
+    if (h > 0) return d + 'd ' + h + 'h ago'
+    if (m > 0) return d + 'd ' + m + 'm ago'
+    return d + 'd ago'
+  }
+
+  if (h > 0) {
+    if (m > 0) return h + 'h ' + m + 'm ago'
+    return h + 'h ago'
+  }
+
+  if (m > 0) {
+    if (s > 0) return m + 'm ' + s + 's ago'
+    return m + 'm ago'
+  }
+
+  return s + 's ago'
 })
 
 /* eslint-disable no-new */

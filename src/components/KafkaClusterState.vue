@@ -52,6 +52,40 @@
           </div>
         </div>
       </div>
+      <div class="card-deck mb-3">
+        <div class="card text-center">
+          <div class="card-header">Kafka Topics</div>
+          <div class="card-body">
+            <h1 :class="['card-text', KafkaBrokerState.Summary.Topics > 0 ? 'text-success' : 'text-warning']">{{ KafkaBrokerState.Summary.Topics }}</h1>
+          </div>
+        </div>
+        <div class="card text-center">
+          <ul class="list-group">
+            <li class="list-group-item"> Max Leader/Broker: {{ Number(KafkaBrokerState.Summary.MaxLeadersPerBroker).toFixed(0) }} </li>
+            <li class="list-group-item"> Avg Leader/Broker: {{ Number(KafkaBrokerState.Summary.AvgLeadersPerBroker).toFixed(0) }} </li>
+            <li class="list-group-item"> Std Leader/Broker: {{ Number(KafkaBrokerState.Summary.StdLeadersPerBroker).toFixed(1) }} </li>
+          </ul>
+        </div>
+        <div class="card text-center">
+          <ul class="list-group">
+            <li class="list-group-item"> Max Replica/Broker: {{ Number(KafkaBrokerState.Summary.MaxReplicasPerBroker).toFixed(0) }} </li>
+            <li class="list-group-item"> Avg Replica/Broker: {{ Number(KafkaBrokerState.Summary.AvgReplicasPerBroker).toFixed(0) }} </li>
+            <li class="list-group-item"> Std Replica/Broker: {{ Number(KafkaBrokerState.Summary.StdReplicasPerBroker).toFixed(1) }} </li>
+          </ul>
+        </div>
+        <div class="card text-center">
+          <div class="card-header">Total Online LogDirs</div>
+          <div class="card-body">
+            <h1 :class="['card-text', stats_online_logdirs === 0 ? 'text-danger' : 'text-success']">{{ stats_online_logdirs }}</h1>
+          </div>
+        </div>
+        <div class="card text-center">
+          <div class="card-header">Total Offline LogDirs</div>
+          <div class="card-body">
+            <h1 :class="['card-text', stats_offline_logdirs === 0 ? 'text-success' : 'text-danger']">{{ stats_offline_logdirs }}</h1>
+          </div>
+        </div>
+      </div>
 
       <!-- detailed information -->
       <kafka-broker-state :state='KafkaBrokerState'></kafka-broker-state>
@@ -108,7 +142,8 @@ export default {
         OutOfSyncCountByBrokerId: {},
         OnlineLogDirsByBrokerId: {},
         LeaderCountByBrokerId: {},
-        OfflineReplicaCountByBrokerId: {}
+        OfflineReplicaCountByBrokerId: {},
+        Summary: {}
       }
     }
   },
@@ -158,6 +193,12 @@ export default {
         oos += n
       })
       return oos
+    },
+    stats_online_logdirs () {
+      return Object.values(this.KafkaBrokerState.OnlineLogDirsByBrokerId).flat().length
+    },
+    stats_offline_logdirs () {
+      return Object.values(this.KafkaBrokerState.OfflineLogDirsByBrokerId).flat().length
     }
   },
   methods: {
@@ -216,6 +257,7 @@ export default {
             vm.KafkaBrokerState.OfflineReplicaCountByBrokerId = data.KafkaBrokerState.OfflineReplicaCountByBrokerId
             vm.KafkaBrokerState.OfflineLogDirsByBrokerId = data.KafkaBrokerState.OfflineLogDirsByBrokerId
             vm.KafkaBrokerState.OnlineLogDirsByBrokerId = data.KafkaBrokerState.OnlineLogDirsByBrokerId
+            vm.KafkaBrokerState.Summary = data.KafkaBrokerState.Summary
           } catch (e) {
             // Kafka 2.0 features not available
           }

@@ -27,7 +27,7 @@
           <div class="card-header">Executor</div>
           <div class="card-body">
             <p class="card-text">
-            <span :class="['badge', ExecutorState.state && ExecutorState.state.match(/STOPPED|ERROR/) ? 'badge-danger': 'badge-success']">{{ ExecutorState.state }}</span>
+            <span :class="['badge', ExecutorState.state && ExecutorState.state.match(/STOP|ERROR/) ? 'badge-danger': 'badge-success']">{{ ExecutorState.state }}</span>
             </p>
           </div>
         </div>
@@ -153,9 +153,9 @@
             <table class="table table-bordered mb-3">
               <thead class="thead-light">
                 <tr>
-                  <th v-if="ExecutorState.maximumConcurrentInterBrokerPartitionMovementsPerBroker != null">Max Concurrency/Broker</th>
-                  <th v-if="ExecutorState.minimumConcurrentInterBrokerPartitionMovementsPerBroker != null">Min Concurrency/Broker</th>
-                  <th v-if="ExecutorState.averageConcurrentInterBrokerPartitionMovementsPerBroker != null">Avg Concurrency/Broker</th>
+                  <th v-if="ExecutorState.maximumConcurrentPartitionMovementsPerBroker != null">Max Concurrency/Broker</th>
+                  <th v-if="ExecutorState.minimumConcurrentPartitionMovementsPerBroker != null">Min Concurrency/Broker</th>
+                  <th v-if="ExecutorState.averageConcurrentPartitionMovementsPerBroker != null">Avg Concurrency/Broker</th>
                   <th>Aborting</th>
                   <th>Aborted</th>
                   <th>Dead</th>
@@ -163,9 +163,9 @@
               </thead>
               <tbody>
                 <tr>
-                  <td v-if="ExecutorState.maximumConcurrentInterBrokerPartitionMovementsPerBroker != null">{{ ExecutorState.maximumConcurrentInterBrokerPartitionMovementsPerBroker }}</td>
-                  <td v-if="ExecutorState.minimumConcurrentInterBrokerPartitionMovementsPerBroker != null">{{ ExecutorState.minimumConcurrentInterBrokerPartitionMovementsPerBroker }}</td>
-                  <td v-if="ExecutorState.averageConcurrentInterBrokerPartitionMovementsPerBroker != null">{{ ExecutorState.averageConcurrentInterBrokerPartitionMovementsPerBroker | formatDecimal }}</td>
+                  <td v-if="ExecutorState.maximumConcurrentPartitionMovementsPerBroker != null">{{ ExecutorState.maximumConcurrentPartitionMovementsPerBroker }}</td>
+                  <td v-if="ExecutorState.minimumConcurrentPartitionMovementsPerBroker != null">{{ ExecutorState.minimumConcurrentPartitionMovementsPerBroker }}</td>
+                  <td v-if="ExecutorState.averageConcurrentPartitionMovementsPerBroker != null">{{ ExecutorState.averageConcurrentPartitionMovementsPerBroker | formatDecimal }}</td>
                   <td>{{ ExecutorState.abortingPartitions }}</td>
                   <td>{{ ExecutorState.abortedPartitions }}</td>
                   <td>{{ ExecutorState.deadPartitions }}</td>
@@ -184,9 +184,9 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{{ ExecutorState.numCancelledInterBrokerPartitionMovements }}</td>
-                    <td>{{ ExecutorState.numInProgressInterBrokerPartitionMovements }}</td>
-                    <td>{{ ExecutorState.numAbortingInterBrokerPartitionMovements }}</td>
+                    <td>{{ ExecutorState.numCancelledPartitionMovements }}</td>
+                    <td>{{ ExecutorState.numInProgressPartitionMovements }}</td>
+                    <td>{{ ExecutorState.numAbortingPartitionMovements }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -324,9 +324,9 @@
           </div>
           <!-- Stopping state: inter-broker verbose tables -->
           <div v-if="isStoppingState">
-            <inter-broker-movement-table title="Cancelled Inter-Broker Movements" :movements="ExecutorState.cancelledInterBrokerPartitionMovement" :hide-empty="true" />
-            <inter-broker-movement-table title="In Progress Inter-Broker Movements" :movements="ExecutorState.inProgressInterBrokerPartitionMovement" :hide-empty="true" />
-            <inter-broker-movement-table title="Aborting Inter-Broker Movements" :movements="ExecutorState.abortingInterBrokerPartitionMovement" :hide-empty="true" />
+            <inter-broker-movement-table title="Cancelled Inter-Broker Movements" :movements="ExecutorState.cancelledPartitionMovement" :hide-empty="true" />
+            <inter-broker-movement-table title="In Progress Inter-Broker Movements" :movements="ExecutorState.inProgressPartitionMovement" :hide-empty="true" />
+            <inter-broker-movement-table title="Aborting Inter-Broker Movements" :movements="ExecutorState.abortingPartitionMovement" :hide-empty="true" />
           </div>
           <!-- Intra-broker verbose tables (active intra-broker state) -->
           <div v-if="isIntraBrokerState">
@@ -382,16 +382,14 @@ const DEFAULT_EXECUTOR_STATE = {
   abortedPartitionMovement: [],
   deadPartitionMovement: [],
   // Inter-broker concurrency
-  maximumConcurrentInterBrokerPartitionMovementsPerBroker: null,
-  minimumConcurrentInterBrokerPartitionMovementsPerBroker: null,
-  averageConcurrentInterBrokerPartitionMovementsPerBroker: null,
+  maximumConcurrentPartitionMovementsPerBroker: null,
+  minimumConcurrentPartitionMovementsPerBroker: null,
+  averageConcurrentPartitionMovementsPerBroker: null,
   // Inter-broker stopping fields
-  numCancelledInterBrokerPartitionMovements: 0,
-  numInProgressInterBrokerPartitionMovements: 0,
-  numAbortingInterBrokerPartitionMovements: 0,
-  cancelledInterBrokerPartitionMovement: [],
-  inProgressInterBrokerPartitionMovement: [],
-  abortingInterBrokerPartitionMovement: [],
+  numCancelledPartitionMovements: 0,
+  numInProgressPartitionMovements: 0,
+  numAbortingPartitionMovements: 0,
+  cancelledPartitionMovement: [],
   // Intra-broker fields
   numTotalIntraBrokerPartitionMovements: 0,
   numFinishedIntraBrokerPartitionMovements: 0,
@@ -547,11 +545,8 @@ export default {
       return result
     },
     getPendingPartitionMovements () {
-      if (typeof this.ExecutorState.pendingPartitionMovement === 'undefined') {
-        return []
-      } else {
-        return this.ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
-      }
+      if (typeof this.ExecutorState.pendingPartitionMovement === 'undefined') return []
+      return this.ExecutorState.pendingPartitionMovement.filter(f => f.state === 'PENDING')
     },
     getInProgressPartitionMovements () {
       let inprogress = []
@@ -565,11 +560,8 @@ export default {
       return inprogress.concat(pending.filter(f => f.state === 'IN_PROGRESS'))
     },
     getPendingIntraBrokerPartitionMovements () {
-      if (typeof this.ExecutorState.pendingIntraBrokerPartitionMovement === 'undefined') {
-        return []
-      } else {
-        return this.ExecutorState.pendingIntraBrokerPartitionMovement.filter(f => f.state === 'PENDING')
-      }
+      if (typeof this.ExecutorState.pendingIntraBrokerPartitionMovement === 'undefined') return []
+      return this.ExecutorState.pendingIntraBrokerPartitionMovement.filter(f => f.state === 'PENDING')
     },
     getInProgressIntraBrokerPartitionMovements () {
       let inprogress = []

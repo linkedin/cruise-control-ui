@@ -31,12 +31,12 @@
       <table class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
-            <th @click='sort("UserTaskId")'>Task Id</th>
-            <th @click='sort("ClientIdentity")'>Client</th>
-            <th @click='sort("StartMs")'>Request Time</th>
+            <th class="pointer" @click='sort("UserTaskId")'>Task Id</th>
+            <th class="pointer" @click='sort("ClientIdentity")'>Client</th>
+            <th class="pointer" @click='sort("StartMs")'>Request Time</th>
             <th>Elapsed Time</th>
-            <th @click='sort("Status")'>Status</th>
-            <th @click='sort("RequestURL")'>Request URL</th>
+            <th class="pointer" @click='sort("Status")'>Status</th>
+            <th class="pointer" @click='sort("RequestURL")'>Request URL</th>
           </tr>
         </thead>
         <tbody>
@@ -169,7 +169,7 @@ export default {
       return this.$helpers.getURL('user_tasks')
     },
     sortedTasks () {
-      return sortBy(this.tasks, this.sortColumn)
+      return sortBy(this.tasks, this.sortColumn).reverse()
     },
     filteredTasks () {
       let result = this.sortedTasks
@@ -189,3 +189,7 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.pointer { cursor: pointer; }
+</style>

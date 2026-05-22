@@ -4,7 +4,7 @@
 export const AUTO_REFRESH_INTERVAL = 30000
 
 // Delay before retrying when CC returns an async/progress response (ms)
-export const ASYNC_RETRY_DELAY = 5000
+export const ASYNC_RETRY_DELAY = 10000
 
 // Max retries when waiting for URL resolution in argsChanged()
 export const ARGS_RETRY_MAX = 20

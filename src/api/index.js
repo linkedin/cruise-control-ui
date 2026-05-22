@@ -10,9 +10,7 @@ function getURL (type, params) {
     params = {}
   }
   if (!Object.prototype.hasOwnProperty.call(params, 'json')) {
-    // demote broker doesn't like to have json param
-    // remove this check once https://github.com/linkedin/cruise-control/issues/249 is fixed
-    if (!type.match(/demote_broker|stop_proposal_execution|pause_sampling|resume_sampling/)) {
+    if (!type.match(/stop_proposal_execution|pause_sampling|resume_sampling/)) {
       params.json = true
     }
   }
