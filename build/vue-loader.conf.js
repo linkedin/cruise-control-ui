@@ -11,7 +11,7 @@ module.exports = {
       : config.dev.cssSourceMap,
     extract: isProduction
   }),
-  transformToRequire: {
+  transformAssetUrls: {
     video: 'src',
     source: 'src',
     img: 'src',

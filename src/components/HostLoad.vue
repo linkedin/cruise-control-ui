@@ -1,17 +1,16 @@
 <!-- Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. -->
 <template>
   <div>
-    <h4>Kafka Server Load</h4>
     <div v-if='error'>
       <exception :exception='errorData'></exception>
     </div>
     <div v-else-if='async'>
       <async-task :asyncData='asyncData'></async-task>
     </div>
-    <div v-else-if="loading && !sortedHosts">
-      Loading ...
+    <div v-else-if="loading && sortedHosts.length === 0">
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
-    <table class="table table-sm table-bordered" v-else-if='sortedHosts && sortedHosts.length > 0'>
+    <table class="table table-sm table-bordered" v-else-if='sortedHosts.length > 0'>
       <thead class="thead-light">
         <tr>
           <th colspan=1 class='text-center'>Broker</th>
@@ -35,12 +34,12 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="e in sortedHosts">
+        <tr v-for="e in sortedHosts" :key="e.Host">
           <td>{{ e.Host | formatHost }}</td>
           <td :class='e.Replicas < 1 ? "table-info" : null'>{{ e.Replicas }}</td>
           <td :class='e.Leaders < 1 ? "table-warning" : null'>{{ e.Leaders }}</td>
           <td>{{ e.DiskMB | formatUnits }}</td>
-          <td>{{ e.CpuPct.toFixed(2) }} %</td>
+          <td>{{ e.CpuPct != null ? e.CpuPct.toFixed(2) : 'N/A' }} %</td>
           <td>{{ e.LeaderNwInRate | formatNetworkUnits }}</td>
           <td>{{ e.FollowerNwInRate | formatNetworkUnits }}</td>
           <td v-if='apiMinorVersion === 2'>{{ e.NwOutRate | formatNetworkUnits }}</td>
@@ -64,8 +63,8 @@ export default {
   props: {
     hosts: Array,
     loading: Boolean,
-    async: false, // when the server treats this request as async
-    asyncData: null, // when the server treats the request as async and sends progress instead of actual response
+    async: { type: Boolean, default: false },
+    asyncData: { type: Object, default: null },
     error: Boolean,
     errorData: Object
   },
@@ -86,7 +85,7 @@ export default {
     apiMinorVersion () {
       // NnwOutRate has been changed to NwOutRate and Upstream
       // API does not expose this correctly.
-      if (this.hosts.length > 0 && this.hosts[0].hasOwnProperty('NwOutRate')) {
+      if (this.hosts && this.hosts.length > 0 && Object.prototype.hasOwnProperty.call(this.hosts[0], 'NwOutRate')) {
         return 2
       } else {
         return 1

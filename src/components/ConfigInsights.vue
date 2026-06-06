@@ -21,7 +21,7 @@
                 <tr v-if='records.length === 0'>
                     <td colspan=5>No records in <code>config.csv</code></td>
                 </tr>
-                <tr v-for='(r, k) in records' :key='r[3]' v-else>
+                <tr v-for='r in records' :key='r[3]' v-else>
                     <td>{{ r[0] }} </td>
                     <td>{{ r[1] }} </td>
                     <td>{{ r[2] }} </td>
@@ -42,7 +42,7 @@
 
 <script>
 import BooleanEL from '@/components/BooleanEL'
-var Url = require('url-parse')
+const Url = require('url-parse')
 export default {
   name: 'ConfigInsights',
   components: {
@@ -53,14 +53,14 @@ export default {
       return Url('/').href
     },
     records () {
-      let r = []
+      const r = []
       Object.keys(this.$store.state.config).forEach((name) => {
         Object.keys(this.$store.state.config[name]).forEach((place) => {
-          let url = this.$store.state.config[name][place]
-          let origin = Url('/')
-          let ccUrl = Url(url)
+          const url = this.$store.state.config[name][place]
+          const origin = Url('/')
+          const ccUrl = Url(url)
           let match = 0
-          let props = ['protocol', 'hostname', 'port']
+          const props = ['protocol', 'hostname', 'port']
           props.forEach((k) => {
             if (origin[k] === ccUrl[k]) {
               match++

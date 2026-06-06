@@ -20,12 +20,12 @@ export default {
     }
   },
   created () {
-    let vm = this
+    const vm = this
     window.addEventListener('online', vm.setOnline)
     window.addEventListener('offline', vm.setOffline)
   },
   beforeDestroy () {
-    let vm = this
+    const vm = this
     window.removeEventListener('online', vm.setOnline)
     window.removeEventListener('offline', vm.setOffline)
   }

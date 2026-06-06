@@ -25,8 +25,8 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for='(m, k) in config' v-if='selectedGroup === "all" || k === selectedGroup'>
-          <summary-row v-for='(u, c) in m' :key='k + c + m' :url='u' :cluster='c' :group='k' :timeout='periodicity'></summary-row>
+        <template v-for='(m, k) in filteredConfig'>
+          <summary-row v-for='(u, c) in m' :key='k + "-" + c' :url='u' :cluster='c' :group='k' :timeout='periodicity'></summary-row>
         </template>
       </tbody>
     </table>
@@ -37,7 +37,7 @@
 import SummaryRow from '@/components/SummaryRow'
 
 export default {
-  name: 'Summary',
+  name: 'ClusterSummary',
   components: {
     SummaryRow
   },
@@ -47,6 +47,15 @@ export default {
     },
     groups () {
       return this.config ? ['all'].concat(Object.keys(this.config)) : ['all']
+    },
+    filteredConfig () {
+      if (!this.config) return {}
+      if (this.selectedGroup === 'all') return this.config
+      const result = {}
+      if (this.config[this.selectedGroup]) {
+        result[this.selectedGroup] = this.config[this.selectedGroup]
+      }
+      return result
     }
   },
   methods: {
@@ -57,7 +66,7 @@ export default {
   data () {
     return {
       periodicity: 60000,
-      selectedGroup: this.groups ? this.groups[-1] : 'all'
+      selectedGroup: 'all'
     }
   }
 }

@@ -6,18 +6,23 @@ module.exports = {
     "jQuery": true
   },
   root: true,
-  parser: 'babel-eslint',
+  parser: 'vue-eslint-parser',
   parserOptions: {
+    parser: '@babel/eslint-parser',
     sourceType: 'module'
   },
   env: {
     browser: true,
   },
   // https://github.com/standard/standard/blob/master/docs/RULES-en.md
-  extends: 'standard',
+  extends: [
+    'standard',
+    'plugin:vue/essential'
+  ],
   // required to lint *.vue files
   plugins: [
-    'html'
+    'html',
+    'vue'
   ],
   // add your custom rules here
   'rules': {
@@ -26,6 +31,8 @@ module.exports = {
     // allow async-await
     'generator-star-spacing': 0,
     // allow debugger during development
-    'no-debugger': process.env.NODE_ENV === 'production' ? 2 : 0
+    'no-debugger': process.env.NODE_ENV === 'production' ? 2 : 0,
+    // project uses single-word component names by convention
+    'vue/multi-word-component-names': 0
   }
 }

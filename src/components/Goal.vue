@@ -1,6 +1,6 @@
 <!-- Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. -->
 <template>
-  <div>
+  <div v-if="goal.clusterModelStats">
   <table class="table table-sm table-bordered table-fixed">
     <thead class='thead-light'>
       <tr>
@@ -31,7 +31,7 @@
       </tr>
     </thead>
     <tbody>
-      <tr v-for='(v, k) in goal.clusterModelStats.statistics'>
+      <tr v-for='(v, k) in goal.clusterModelStats.statistics' :key="k">
         <th>{{ k }}</th>
         <td>{{ v.disk | formatUnits }}</td>
         <td>{{ v.replicas.toFixed(0) }}</td>
@@ -44,6 +44,7 @@
     </tbody>
   </table>
   </div>
+  <div v-else class="text-muted">No cluster model stats available.</div>
 </template>
 
 <script>

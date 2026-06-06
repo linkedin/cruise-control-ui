@@ -16,25 +16,34 @@
       <async-task :asyncData='asyncData'></async-task>
     </div>
     <div v-else-if="loading">
-      Loading ...
+      <div class="text-center p-3"><div class="spinner-border text-primary" role="status"></div> Loading ...</div>
     </div>
     <div v-else-if='sortedTasks.length > 0'>
+      <div class="form-inline mb-2">
+        <input type="text" class="form-control form-control-sm mr-2" v-model="searchText" placeholder="Search by Task ID or Client...">
+        <select class="form-control form-control-sm" v-model="statusFilter">
+          <option value="">All Statuses</option>
+          <option value="Active">Active</option>
+          <option value="Completed">Completed</option>
+          <option value="CompletedWithError">CompletedWithError</option>
+        </select>
+      </div>
       <table class="table table-sm table-bordered">
         <thead class="thead-light">
           <tr>
-            <th @click='sort("UserTaskId")'>Task Id</th>
-            <th @click='sort("ClientIdentity")'>Client</th>
-            <th @click='sort("StartMs")'>Request Time</th>
+            <th class="pointer" @click='sort("UserTaskId")'>Task Id</th>
+            <th class="pointer" @click='sort("ClientIdentity")'>Client</th>
+            <th class="pointer" @click='sort("StartMs")'>Request Time</th>
             <th>Elapsed Time</th>
-            <th @click='sort("Status")'>Status</th>
-            <th @click='sort("RequestURL")'>Request URL</th>
+            <th class="pointer" @click='sort("Status")'>Status</th>
+            <th class="pointer" @click='sort("RequestURL")'>Request URL</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="t in sortedTasks">
+          <tr v-for="t in filteredTasks" :key="t.UserTaskId">
             <td>{{ t.UserTaskId }}</td>
             <td>{{ t.ClientIdentity }}</td>
-            <td>{{ (new Date(parseInt(t.StartMs, 10))).toString().substr(0, 34) }}</td>
+            <td>{{ (new Date(parseInt(t.StartMs, 10))).toLocaleString() }}</td>
             <td>{{ t.StartMs | formatLocalTime }}</td>
             <td>
               <span v-if='t.Status === "Completed"' class="badge badge-success">{{ t.Status }}</span>
@@ -50,7 +59,8 @@
 </template>
 
 <script>
-import BooleanEL from '@/components/BooleanEL'
+import { ASYNC_RETRY_DELAY, ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 const sortBy = require('lodash.sortby')
 
 export default {
@@ -58,9 +68,6 @@ export default {
   props: {
     group: String,
     cluster: String
-  },
-  components: {
-    BooleanEL
   },
   data () {
     return {
@@ -70,12 +77,24 @@ export default {
       errorData: null,
       async: false,
       asyncData: null,
-      tasks: Array,
-      sortColumn: 'StartMs'
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
+      tasks: [],
+      sortColumn: 'StartMs',
+      searchText: '',
+      statusFilter: ''
     }
   },
   created () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
   watch: {
     group: function (ogroup, ngroup) {
@@ -86,10 +105,21 @@ export default {
     }
   },
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
+      }
       this.$store.commit('seturl', newurl)
       this.loaded = false
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
       this.getUserTasks()
     },
     sort (col) {
@@ -98,25 +128,36 @@ export default {
     getUserTasks () {
       const vm = this
       vm.loading = true
-      vm.$http.get(vm.url, {withCredentials: true}).then((r) => {
-        if (r.data === null || r.data === undefined || r.data === '') {
+      fetchCC(vm.url).then((result) => {
+        if (result.type === 'empty') {
+          vm.loading = false
           vm.error = true
-          vm.errorData = 'CruiseControl sent an empty response with 200-OK status code. Please file a bug here https://github.com/linkedin/cruise-control/issues'
-        } else if (r.headers['content-type'].match(/text\/plain/) || r.data.progress) {
+          vm.errorData = 'CruiseControl sent an empty response with ' + result.status + ' status code.'
+        } else if (result.type === 'async') {
+          vm.loading = false
           vm.async = true
-          vm.asyncData = r.data
+          vm.asyncData = result.data
+          if (vm.asyncRetryTimer) clearTimeout(vm.asyncRetryTimer)
+          vm.asyncRetryTimer = setTimeout(() => vm.getUserTasks(), ASYNC_RETRY_DELAY)
+        } else if (result.type === 'error') {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
+          vm.loading = false
+          vm.error = true
+          vm.errorData = result.data
         } else {
+          if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
           vm.async = false
+          vm.loading = false
           vm.error = false
           vm.errorData = null
-          vm.tasks = r.data.userTasks
+          vm.tasks = result.data.userTasks || []
+          vm.loaded = true
         }
-        vm.loading = false
-        vm.loaded = true
-      }, (e) => {
+      }).catch((e) => {
+        if (vm.asyncRetryTimer) { clearTimeout(vm.asyncRetryTimer); vm.asyncRetryTimer = null }
         vm.loading = false
         vm.error = true
-        vm.errorData = e && e.response && e.response.data ? e.response.data : e
+        vm.errorData = e.message || e
       })
     }
   },
@@ -128,8 +169,27 @@ export default {
       return this.$helpers.getURL('user_tasks')
     },
     sortedTasks () {
-      return sortBy(this.tasks, this.sortColumn)
+      return sortBy(this.tasks, this.sortColumn).reverse()
+    },
+    filteredTasks () {
+      let result = this.sortedTasks
+      if (this.statusFilter) {
+        result = result.filter(t => t.Status === this.statusFilter)
+      }
+      if (this.searchText) {
+        const q = this.searchText.toLowerCase()
+        result = result.filter(t => {
+          return (t.UserTaskId && t.UserTaskId.toLowerCase().includes(q)) ||
+            (t.ClientIdentity && t.ClientIdentity.toLowerCase().includes(q)) ||
+            (t.RequestURL && t.RequestURL.toLowerCase().includes(q))
+        })
+      }
+      return result
     }
   }
 }
 </script>
+
+<style scoped>
+.pointer { cursor: pointer; }
+</style>

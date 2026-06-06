@@ -1,31 +1,31 @@
 /* Copyright 2017-2019 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information. */
 
+var path = require('path')
 var utils = require('./utils')
 var webpack = require('webpack')
 var config = require('../config')
-var merge = require('webpack-merge')
+var { merge } = require('webpack-merge')
 var baseWebpackConfig = require('./webpack.base.conf')
 var HtmlWebpackPlugin = require('html-webpack-plugin')
-var FriendlyErrorsPlugin = require('friendly-errors-webpack-plugin')
+var FriendlyErrorsPlugin = require('@soda/friendly-errors-webpack-plugin')
 
 // add hot-reload related code to entry chunks
+var devEntry = {}
 Object.keys(baseWebpackConfig.entry).forEach(function (name) {
-  baseWebpackConfig.entry[name] = ['./build/dev-client'].concat(baseWebpackConfig.entry[name])
+  devEntry[name] = ['./build/dev-client'].concat(baseWebpackConfig.entry[name])
 })
 
 module.exports = merge(baseWebpackConfig, {
+  entry: devEntry,
+  mode: 'development',
   module: {
     rules: utils.styleLoaders({ sourceMap: config.dev.cssSourceMap })
   },
-  // cheap-module-eval-source-map is faster for development
-  devtool: '#cheap-module-eval-source-map',
+  // cheap-module-source-map is faster for development
+  devtool: 'eval-cheap-module-source-map',
   plugins: [
-    new webpack.DefinePlugin({
-      'process.env': config.dev.env
-    }),
-    // https://github.com/glenjamin/webpack-hot-middleware#installation--usage
+    // https://github.com/webpack-contrib/webpack-hot-middleware#installation--usage
     new webpack.HotModuleReplacementPlugin(),
-    new webpack.NoEmitOnErrorsPlugin(),
     // https://github.com/ampedandwired/html-webpack-plugin
     new HtmlWebpackPlugin({
       filename: 'index.html',

@@ -2,10 +2,11 @@
 
 var path = require('path')
 var webpack = require('webpack')
-var fs = require('fs')
 var utils = require('./utils')
 var config = require('../config')
 var vueLoaderConfig = require('./vue-loader.conf')
+var ESLintPlugin = require('eslint-webpack-plugin')
+var { VueLoaderPlugin } = require('vue-loader')
 
 function resolve (dir) {
   return path.join(__dirname, '..', dir)
@@ -18,7 +19,16 @@ module.exports = {
       jquery: 'jquery',
       'window.jQuery': 'jquery',
       jQuery: 'jquery'
-    })
+    }),
+    new ESLintPlugin({
+      extensions: ['js', 'vue'],
+      context: resolve('src'),
+      failOnError: true,
+      failOnWarning: false,
+      emitWarning: true,
+      emitError: true
+    }),
+    new VueLoaderPlugin()
   ],
   entry: {
     app: './src/main.js'
@@ -41,15 +51,6 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.(js|vue)$/,
-        loader: 'eslint-loader',
-        enforce: 'pre',
-        include: [resolve('src'), resolve('test')],
-        options: {
-          formatter: require('eslint-friendly-formatter')
-        }
-      },
-      {
         test: /\.vue$/,
         loader: 'vue-loader',
         options: vueLoaderConfig
@@ -64,7 +65,7 @@ module.exports = {
         loader: 'url-loader',
         options: {
           limit: 10000,
-          name: utils.assetsPath('img/[name].[hash:7].[ext]')
+          name: utils.assetsPath('img/[name].[contenthash:7].[ext]')
         }
       },
       {
@@ -72,7 +73,7 @@ module.exports = {
         loader: 'url-loader',
         options: {
           limit: 10000,
-          name: utils.assetsPath('media/[name].[hash:7].[ext]')
+          name: utils.assetsPath('media/[name].[contenthash:7].[ext]')
         }
       },
       {
@@ -80,7 +81,7 @@ module.exports = {
         loader: 'url-loader',
         options: {
           limit: 10000,
-          name: utils.assetsPath('fonts/[name].[hash:7].[ext]')
+          name: utils.assetsPath('fonts/[name].[contenthash:7].[ext]')
         }
       }
     ]

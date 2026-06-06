@@ -18,7 +18,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for='(v, bid) in state.ReplicaCountByBrokerId'>
+        <tr v-for='(v, bid) in state.ReplicaCountByBrokerId' :key="bid">
           <td>{{ bid }}</td>
           <td>{{ v }}</td>
           <td :class='!state.LeaderCountByBrokerId[bid] ? "table-danger" : null'>{{ state.LeaderCountByBrokerId[bid] || 0 }}</td>
@@ -30,7 +30,7 @@
           <td>
             {{ state.OnlineLogDirsByBrokerId[bid] ? state.OnlineLogDirsByBrokerId[bid].length : 0 }}
           </td>
-          <td :class='state.OfflineLogDirsByBrokerId[bid].length > 0 ? "table-danger" : null'>
+          <td :class='state.OfflineLogDirsByBrokerId[bid] && state.OfflineLogDirsByBrokerId[bid].length > 0 ? "table-danger" : null'>
             {{ state.OfflineLogDirsByBrokerId[bid] ? state.OfflineLogDirsByBrokerId[bid].length : 0 }}
           </td>
           </template>

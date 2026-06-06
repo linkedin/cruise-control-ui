@@ -56,8 +56,8 @@
       </div>
     </div>
 
-    <div class="alert alert-danger" role="alert" v-if="error">
-      {{ error }}
+    <div v-if="error">
+      <exception :exception='error'></exception>
     </div>
 
     <div class="row" v-show="stacked">
@@ -103,6 +103,8 @@
 
 <script>
 import LineChart from '@/components/LineChart.vue'
+import { ARGS_RETRY_MAX, ARGS_RETRY_DELAY } from '@/constants'
+import fetchCC from '@/fetchCC'
 
 class Topic {
   constructor () {
@@ -114,7 +116,7 @@ class Topic {
   }
 
   addLeader (item) {
-    let broker = item.leader
+    const broker = item.leader
     if (this.leaders[broker] === undefined) {
       this.leaders[broker] = 1
       return
@@ -123,10 +125,10 @@ class Topic {
   }
 
   addReplicas (item) {
-    let replicas = Object.values(item.followers)
+    const replicas = Object.values(item.followers)
     replicas.push(item.leader)
 
-    replicas.map(follower => {
+    replicas.forEach(follower => {
       if (this.replicas[follower] === undefined) {
         this.replicas[follower] = 1
         return
@@ -144,12 +146,12 @@ class Topic {
   }
 
   countDisk (item) {
-    let replicationFactor = item.followers.length + 1
+    const replicationFactor = item.followers.length + 1
     this.disk += item.disk * replicationFactor
   }
 
   getSize () {
-    let decimals = 2
+    const decimals = 2
     if (this.disk === 0) return '0 MiB'
     const k = 1024
     const sizes = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
@@ -179,7 +181,11 @@ export default {
       resource: 'leaders',
       stacked: false,
       filter: '',
-      cachedKccData: null,
+      cachedKccData: [],
+      async: false,
+      asyncData: null,
+      argsRetryTimer: null,
+      asyncRetryTimer: null,
       error: null,
       brokerList: []
     }
@@ -187,6 +193,14 @@ export default {
 
   beforeMount () {
     this.argsChanged()
+  },
+  beforeDestroy () {
+    if (this.argsRetryTimer) {
+      clearTimeout(this.argsRetryTimer)
+    }
+    if (this.asyncRetryTimer) {
+      clearTimeout(this.asyncRetryTimer)
+    }
   },
 
   watch: {
@@ -199,51 +213,64 @@ export default {
   },
 
   mounted () {
-    this.fetchKccData()
     this.moptions = this.getOptions('test')
   },
 
   methods: {
-    argsChanged () {
+    argsChanged (retries) {
+      retries = retries || 0
       const newurl = this.$store.getters.getnewurl(this.group, this.cluster)
-      this.$store.commit('seturl', newurl)
-    },
-    cacheKccDataItem (item) {
-      if (!this.cachedKccData.has(item.topic)) {
-        this.cachedKccData.set(item.topic, new Topic())
+      if (!newurl) {
+        if (retries < ARGS_RETRY_MAX) {
+          this.argsRetryTimer = setTimeout(() => this.argsChanged(retries + 1), ARGS_RETRY_DELAY)
+        }
+        return
       }
-      this.cachedKccData.get(item.topic).addLeader(item)
-      this.cachedKccData.get(item.topic).addReplicas(item)
-      this.cachedKccData.get(item.topic).countCpu(item)
-      this.cachedKccData.get(item.topic).countDisk(item)
-      this.cachedKccData.get(item.topic).replicationFactor = Math.max(this.cachedKccData.get(item.topic).replicationFactor, item.followers.length + 1)
+      this.$store.commit('seturl', newurl)
+      if (this.asyncRetryTimer) {
+        clearTimeout(this.asyncRetryTimer)
+        this.asyncRetryTimer = null
+      }
+      this.fetchKccData()
     },
     fetchKccData () {
-      this.cachedKccData = new Map()
-      this.$http
-        .get(this.$helpers.getURL('partitionload', {}))
-        .then(response => {
-          let brokerList = new Set()
-          for (let record of response.data.records) {
-            this.cacheKccDataItem(record)
-            brokerList.add(record.leader, ...record.followers)
+      const vm = this
+      vm.error = null
+      vm.cachedKccData = []
+      vm.brokerList = []
+      const topicMap = {}
+      const url = vm.$helpers.getURL('partitionload', {})
+      fetchCC(url).then(function (result) {
+        if (result.type === 'error') {
+          vm.error = result.data
+          return
+        }
+        if (result.type !== 'success' || !result.data || !result.data.records) {
+          return
+        }
+        const brokerList = new Set()
+        for (const record of result.data.records) {
+          if (!topicMap[record.topic]) {
+            topicMap[record.topic] = new Topic()
           }
-          this.brokerList = [...brokerList].sort()
-        })
-        .then(e => {
-          this.cachedKccData = new Map([...this.cachedKccData.entries()].sort((a, b) => {
-            if (a[1].disk > b[1].disk) {
-              return -1
-            }
-            return 1
-          }))
-        })
-        .catch(error => {
-          this.error = error.response.data
-        })
+          const topic = topicMap[record.topic]
+          topic.addLeader(record)
+          topic.addReplicas(record)
+          topic.countCpu(record)
+          topic.countDisk(record)
+          topic.replicationFactor = Math.max(topic.replicationFactor, record.followers.length + 1)
+          brokerList.add(record.leader)
+          record.followers.forEach(f => brokerList.add(f))
+        }
+        vm.brokerList = [...brokerList].sort()
+        vm.cachedKccData = Object.entries(topicMap)
+          .sort((a, b) => a[1].disk > b[1].disk ? -1 : 1)
+      }).catch(function (error) {
+        vm.error = error && error.message ? error.message : error
+      })
     },
     formatItemData (item) {
-      let resources = item[1][this.resource]
+      const resources = item[1][this.resource]
       return {
         datasets: [{
           data: [...Object.values(resources)],
@@ -253,11 +280,11 @@ export default {
       }
     },
     formatItemOptions (item) {
-      let title = `${item[0]} (RF ${item[1].replicationFactor}, size ${item[1].getSize()})`
+      const title = `${item[0]} (RF ${item[1].replicationFactor}, size ${item[1].getSize()})`
       return this.getOptions(title)
     },
     getOptions (title) {
-      let options = {
+      const options = {
         legend: {
           display: false
         },
@@ -286,26 +313,26 @@ export default {
 
   computed: {
     formatStackedData () {
-      let stackedKccData = {
+      const stackedKccData = {
         labels: this.brokerList,
         datasets: []
       }
 
-      if (this.cachedKccData === null) {
+      if (!this.cachedKccData || this.cachedKccData.length === 0) {
         return stackedKccData
       }
 
       let counter = 0
-      for (let topic of this.cachedKccData) {
-        let dataset = {
+      for (const topic of this.cachedKccData) {
+        const dataset = {
           label: topic[0],
           data: [],
           backgroundColor: this.$store.state.chartColors[counter]
         }
         counter++
         counter = counter % this.$store.state.chartColors.length
-        for (let broker of this.brokerList) {
-          let value = (topic[1][this.resource][broker] !== undefined) ? topic[1][this.resource][broker] : 0
+        for (const broker of this.brokerList) {
+          const value = (topic[1][this.resource][broker] !== undefined) ? topic[1][this.resource][broker] : 0
           dataset.data.push(value)
         }
         stackedKccData.datasets.push(dataset)
@@ -315,7 +342,7 @@ export default {
     },
 
     getStackedOptions () {
-      let options = this.getOptions(`stacked ${this.resource} view`)
+      const options = this.getOptions(`stacked ${this.resource} view`)
       options.scales.xAxes = [{ stacked: true }]
       options.scales.yAxes[0].stacked = true
       options.scales.yAxes[0].scaleLabel.labelString = this.resource === 'cpu' ? '% cpu' : `nb ${this.resource}`
